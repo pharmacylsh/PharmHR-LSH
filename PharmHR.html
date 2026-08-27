@@ -26,7 +26,95 @@ table{border-collapse:collapse}
 </head>
 <body>
 <div id="root"></div>
+<!-- Optional cross-device sync (see SETUP-SYNC.md). Harmless if SUPABASE_ENABLED stays false below. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+// ==== js\supabase-config.js ====
+// Fill this in with your own Supabase project's URL and anon key, then set
+// SUPABASE_ENABLED to true. Until then the app keeps working exactly as before —
+// each browser only sees its own data (saved to its local storage).
+//
+// See SETUP-SYNC.md in the project folder for the full walkthrough: create the
+// project, run the SQL that creates the table, enable anonymous sign-in, then copy
+// the two values below from Project Settings > API.
+
+const SUPABASE_URL = "https://zpmfhkcqrfaxhwwcrhaf.supabase.co/rest/v1/";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwbWZoa2NxcmZheGh3d2NyaGFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc4MTE5ODAsImV4cCI6MjEwMzM4Nzk4MH0.VAI8xe1u-hvD8BSglhhBwerbWTpJVTq2zTLe36-_9pw";
+
+const SUPABASE_ENABLED = true;
+
+// ==== js\remote-sync.js ====
+// Optional cross-device sync via Supabase (Postgres). Only activates when
+// SUPABASE_ENABLED is true and SUPABASE_URL/SUPABASE_ANON_KEY (see
+// supabase-config.js) are filled in — otherwise every function here is a harmless
+// no-op and the app keeps using only this browser's local storage, exactly like before.
+//
+// Model: the whole shared slice of app state lives in ONE row (id = "shared") of the
+// `pharmhr_state` table, as a single jsonb column. Every device that changes
+// something upserts that row; every device subscribes to Postgres changes on it and
+// applies whatever it now holds. That means it's last-write-wins — fine for a small
+// internal team, but two people editing the exact same moment can have one edit
+// overwrite the other.
+const RemoteSync = (() => {
+  const TABLE = "pharmhr_state";
+  const ROW_ID = "shared";
+  let client = null;
+  let lastPushedRev = null;
+
+  function isConfigured() {
+    return typeof SUPABASE_ENABLED !== "undefined" && SUPABASE_ENABLED
+      && typeof SUPABASE_URL !== "undefined" && SUPABASE_URL
+      && typeof SUPABASE_ANON_KEY !== "undefined" && SUPABASE_ANON_KEY
+      && typeof supabase !== "undefined";
+  }
+
+  async function ensureSignedIn() {
+    const { data } = await client.auth.getSession();
+    if (data && data.session) return;
+    const { error } = await client.auth.signInAnonymously();
+    if (error) console.warn("PharmHR sync: anonymous sign-in failed", error);
+  }
+
+  function init(onRemoteState) {
+    if (!isConfigured()) return false;
+    try {
+      client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      ensureSignedIn().then(() => {
+        // Initial read, in case the row already exists before our subscription below
+        // starts receiving change events.
+        client.from(TABLE).select("state, rev").eq("id", ROW_ID).maybeSingle()
+          .then(({ data, error }) => {
+            if (error) { console.warn("PharmHR sync: initial fetch failed", error); return; }
+            if (data && data.state) onRemoteState(data.state);
+          });
+
+        client.channel("pharmhr-state-changes")
+          .on("postgres_changes", { event: "*", schema: "public", table: TABLE, filter: "id=eq." + ROW_ID }, payload => {
+            const row = payload.new;
+            if (!row || !row.state) return;
+            if (row.rev && row.rev === lastPushedRev) return; // echo of our own write
+            onRemoteState(row.state);
+          })
+          .subscribe();
+      }).catch(e => console.warn("PharmHR sync: setup failed", e));
+      return true;
+    } catch (e) {
+      console.warn("PharmHR sync: init failed, staying in local-only mode", e);
+      return false;
+    }
+  }
+
+  function push(state) {
+    if (!client) return;
+    const rev = Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+    lastPushedRev = rev;
+    client.from(TABLE).upsert({ id: ROW_ID, state, rev, updated_at: new Date().toISOString() })
+      .then(({ error }) => { if (error) console.warn("PharmHR sync: push failed", error); });
+  }
+
+  return { init, push };
+})();
+
 // ==== js\data.js ====
 // Mock data extracted from the PharmHR design mockup.
 const TH_M = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
@@ -356,7 +444,9 @@ const Model = (() => {
 })();
 
 // ==== js\store.js ====
-// Central mutable state + localStorage persistence. Any change triggers a full re-render (via Store.onChange).
+// Central mutable state. Everything persists to this browser's local storage; the
+// SHARED_KEYS subset also syncs through RemoteSync (Firestore) when that's configured,
+// so multiple computers can see the same roster/records — see remote-sync.js.
 const Store = (() => {
   const STORAGE_KEY = "pharmhr.state.v1";
 
@@ -373,13 +463,23 @@ const Store = (() => {
     appr: {}, modal: null, form: {}
   });
 
-  const PERSIST_KEYS = [
-    "auth", "loginRole", "remember", "currentUserId", "newPersons", "deletedIds", "confList", "targets", "users",
-    "role", "page", "tab", "sel", "month", "q", "track", "idpFilter",
+  // Saved to this browser only (which page you're on, what's selected, open modals,
+  // your own login session). Never pushed to or overwritten by other devices.
+  const SESSION_KEYS = [
+    "auth", "loginRole", "remember", "currentUserId",
+    "role", "page", "tab", "sel", "month", "q", "track", "idpFilter", "admQ"
+  ];
+
+  // The actual data: rosters, accounts, records — this is what should look the same
+  // on every computer, so it's the part that syncs through RemoteSync.
+  const SHARED_KEYS = [
+    "newPersons", "deletedIds", "confList", "targets", "users",
     "extraCourses", "extraTalks", "extraRes", "tags",
     "aspireTrack", "aspireSub", "aspireYear", "aspireNote",
     "conf", "daily", "dailySaved", "dailyDate", "appr"
   ];
+
+  const PERSIST_KEYS = SESSION_KEYS.concat(SHARED_KEYS);
 
   let state = defaults();
   let renderCb = null;
@@ -396,6 +496,12 @@ const Store = (() => {
     return saved;
   }
 
+  function pick(keys, obj) {
+    const out = {};
+    keys.forEach(k => out[k] = obj[k]);
+    return out;
+  }
+
   function load() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -408,11 +514,9 @@ const Store = (() => {
     }
   }
 
-  function persist() {
+  function persistLocal() {
     try {
-      const out = {};
-      PERSIST_KEYS.forEach(k => out[k] = state[k]);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(out));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(pick(PERSIST_KEYS, state)));
     } catch (e) {
       console.warn("PharmHR: could not save state", e);
     }
@@ -424,8 +528,24 @@ const Store = (() => {
 
   function setState(patch) {
     state = Object.assign({}, state, typeof patch === "function" ? patch(state) : patch);
-    persist();
+    persistLocal();
+    if (typeof RemoteSync !== "undefined") RemoteSync.push(pick(SHARED_KEYS, state));
     if (renderCb) renderCb();
+  }
+
+  // Applied when another device pushes a change: merges only the shared data in —
+  // this browser's own session (page, selection, open modal, login) is left alone —
+  // and does NOT push back out, so it can't loop with RemoteSync.
+  function applyRemote(sharedData) {
+    const migrated = migrate(Object.assign({}, sharedData));
+    Model.invalidate();
+    state = Object.assign({}, state, pick(SHARED_KEYS, Object.assign(defaults(), migrated)));
+    persistLocal();
+    if (renderCb) renderCb();
+  }
+
+  function initRemote() {
+    if (typeof RemoteSync !== "undefined") RemoteSync.init(applyRemote);
   }
 
   function reset() {
@@ -435,7 +555,7 @@ const Store = (() => {
     if (renderCb) renderCb();
   }
 
-  return { load, setState, get, onChange, reset };
+  return { load, setState, get, onChange, reset, initRemote };
 })();
 
 // ==== js\viewmodel.js ====
@@ -2051,6 +2171,7 @@ function resolveScreen(vals) {
 Store.onChange(renderApp);
 Store.load();
 renderApp();
+Store.initRemote();
 
 </script>
 </body>
