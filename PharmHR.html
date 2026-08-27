@@ -112,14 +112,36 @@ const RemoteSync = (() => {
       .then(({ error }) => { if (error) console.warn("PharmHR sync: push failed", error); });
   }
 
-  return { init, push };
+  // Uploads a file to the "attachments" storage bucket (see SETUP-SYNC.md) and
+  // returns its public URL, or null if sync isn't configured / the upload failed —
+  // callers fall back to just remembering the filename in that case.
+  async function uploadFile(file) {
+    if (!client) return null;
+    try {
+      const path = Date.now() + "-" + Math.random().toString(36).slice(2, 8) + "-" + file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+      const { error } = await client.storage.from("attachments").upload(path, file);
+      if (error) { console.warn("PharmHR sync: file upload failed", error); return null; }
+      const { data } = client.storage.from("attachments").getPublicUrl(path);
+      return (data && data.publicUrl) || null;
+    } catch (e) {
+      console.warn("PharmHR sync: file upload failed", e);
+      return null;
+    }
+  }
+
+  return { init, push, uploadFile };
 })();
 
 // ==== js\data.js ====
-// Mock data extracted from the PharmHR design mockup.
+// Reference data + option lists. RAW/CONFS_SEED/ALUMNI/APPR_SEED all start empty —
+// this deployment is used for real recording, not the design mockup's demo data.
 const TH_M = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
 const TH_MFULL = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
 
+// Default Career Path list. Admin can add to / rename this from the app (adm_target
+// page) — see VM.getTracks/setTracks. People reference a track by its INDEX in
+// whichever list is current, so adding new tracks (append) or renaming one is safe;
+// never reorder or remove one that people still reference.
 const TRACKS = [
   ["Pharmaceutical Management","งานบริหารเวชภัณฑ์","#0e6b5b"],
   ["Pharmaceutical Compounding (IV Admixture)","งานผลิตยาปราศจากเชื้อ","#2a5f8f"],
@@ -130,126 +152,30 @@ const TRACKS = [
   ["Pharmacy Informatics","งานสารสนเทศเภสัชกรรม","#1d6fa5"],
   ["Pharmaceutical Knowledge Management","งานจัดการความรู้","#6b7a1e"]
 ];
+const TRACK_COLORS = ["#0e6b5b","#2a5f8f","#5d4a9c","#0f7a86","#a9640f","#b0332a","#1d6fa5","#6b7a1e","#8a5310","#3d4b47"];
 
-const RAW = [
-  ["ภญ.ศิริพร วงศ์สถาพร","เภสัชกรเชี่ยวชาญ",0,"Head of Department","2001-06-01",52,6,4],
-  ["ภก.ธนวัฒน์ อินทรโชติ","เภสัชกรชำนาญการพิเศษ",4,"Oncology Pharmacy","2007-05-16",61,8,5],
-  ["ภญ.พิมพ์ชนก เรืองศรี","เภสัชกรชำนาญการ",1,"IV Admixture","2013-10-01",44,3,2],
-  ["ภก.กิตติพงษ์ แสนสุข","เภสัชกรชำนาญการ",2,"Chemotherapy Preparation","2012-04-02",47,2,1],
-  ["ภญ.ณัฐริกา สุขวัฒน์","เภสัชกรชำนาญการ",4,"Anticoagulant Clinic","2016-06-01",38,4,2],
-  ["ภก.ศุภกร มณีวรรณ","เภสัชกรปฏิบัติการ",6,"Clinical Decision Support","2021-03-15",29,1,1],
-  ["ภญ.อรุณี พงษ์ไพบูลย์","เภสัชกรชำนาญการ",5,"Medication Safety","2011-09-01",41,5,3],
-  ["ภก.วีรภัทร จันทโรจน์","เภสัชกรปฏิบัติการ",3,"Outpatient Services","2022-01-04",24,0,0],
-  ["ภญ.กมลชนก ศรีวิชัย","เภสัชกรชำนาญการ",4,"Infectious Disease / HIV","2014-05-01",46,3,2],
-  ["ภก.ปิยะพงษ์ ธนาวุฒิ","เภสัชกรชำนาญการ",4,"TB Clinic","2015-02-16",35,2,1],
-  ["ภญ.สุทธิดา แก้วประเสริฐ","เภสัชกรปฏิบัติการ",4,"Asthma / COPD Clinic","2020-08-03",31,1,0],
-  ["ภก.อนุชา บุญมาก","เภสัชกรชำนาญการ",0,"Drug Supply Chain","2013-01-07",39,2,1],
-  ["ภญ.เบญจวรรณ ทองอินทร์","เภสัชกรปฏิบัติการ",4,"Diabetes Clinic","2021-11-01",27,0,1],
-  ["ภก.ณัฐพล วัฒนกุล","เภสัชกรชำนาญการ",7,"Knowledge Management","2012-07-02",43,6,3],
-  ["ภญ.รัตนาภรณ์ ชูเกียรติ","เภสัชกรชำนาญการพิเศษ",3,"Inpatient Services","2006-11-01",50,4,2],
-  ["ภก.สหรัฐ พูนทรัพย์","เภสัชกรปฏิบัติการ",1,"IV Admixture","2022-06-01",22,0,0],
-  ["ภญ.จิราพร ชัยมงคล","เภสัชกรชำนาญการ",4,"Nephrology","2015-09-16",37,2,2],
-  ["ภก.ธีรเดช สุวรรณโชติ","เภสัชกรชำนาญการ",4,"ADR Monitoring","2014-02-03",42,3,1],
-  ["ภญ.ปรียานุช เจริญพงศ์","เภสัชกรปฏิบัติการ",4,"Palliative Care","2021-05-04",26,1,0],
-  ["ภก.กฤษดา แสงทอง","เภสัชกรชำนาญการ",2,"Chemotherapy Preparation","2016-01-05",33,1,1],
-  ["ภญ.วรรณิศา ภักดีวงศ์","เภสัชกรปฏิบัติการ",5,"Quality Assurance","2020-02-03",30,0,1],
-  ["ภก.ชัยวัฒน์ ประเสริฐสุข","เภสัชกรชำนาญการ",3,"Ambulatory Care","2013-06-03",36,2,0],
-  ["ภญ.สิริกาญจน์ พรหมมา","เภสัชกรปฏิบัติการ",4,"Geriatrics","2022-03-01",23,0,0],
-  ["ภก.อภิสิทธิ์ นาคเจริญ","เภสัชกรชำนาญการ",6,"Data & Analytics","2014-10-01",45,4,2],
-  ["ภญ.นันทิชา วงศ์อารีย์","เภสัชกรปฏิบัติการ",4,"Acute Care","2023-02-01",19,0,0],
-  ["ภก.เอกภพ สิริวัฒนา","เภสัชกรชำนาญการ",0,"Procurement","2012-12-03",34,1,1],
-  ["ภญ.ชนิดาภา ศรีสมบัติ","เภสัชกรปฏิบัติการ",3,"Outpatient Services","2023-06-01",17,0,0],
-  ["จพ.สมชาย ใจดีงาม","เจ้าพนักงานเภสัชกรรมอาวุโส",3,"Dispensing Support","2004-03-01",25,1,0],
-  ["จพ.มาลี พรมสุวรรณ","เจ้าพนักงานเภสัชกรรมชำนาญงาน",1,"Sterile Support","2009-07-01",21,0,0],
-  ["จพ.ประวิทย์ เกิดผล","เจ้าพนักงานเภสัชกรรมชำนาญงาน",0,"Inventory Control","2010-05-04",20,0,0],
-  ["จพ.สุนิสา ทองแท้","เจ้าพนักงานเภสัชกรรมปฏิบัติงาน",3,"Dispensing Support","2019-01-02",16,0,0],
-  ["จพ.วิชัย รุ่งเรือง","เจ้าพนักงานเภสัชกรรมชำนาญงาน",3,"Inpatient Support","2011-08-01",18,0,0],
-  ["จพ.กาญจนา ผลบุญ","เจ้าพนักงานเภสัชกรรมปฏิบัติงาน",1,"Sterile Support","2020-06-01",14,0,0],
-  ["จพ.ธนกร แซ่ลี้","เจ้าพนักงานเภสัชกรรมปฏิบัติงาน",0,"Inventory Control","2021-09-01",13,0,0],
-  ["ภญ.ศศิธร มั่นคงดี","เภสัชกรชำนาญการ",4,"Ambulatory DM Clinic","2017-04-03",32,1,1],
-  ["ภก.พีรพัฒน์ ทวีสิน","เภสัชกรปฏิบัติการ",5,"Risk Management","2022-10-03",28,1,0],
-  ["ภญ.ธนัชพร เลิศวิไล","เภสัชกรปฏิบัติการ",7,"Academic Support","2023-10-02",15,1,0],
-  ["ภก.กันตพงศ์ ศิริชัย","เภสัชกรปฏิบัติการ",6,"Pharmacy Informatics","2024-02-01",12,0,0],
-  ["ภญ.อัจฉรา ดำรงศักดิ์","เภสัชกรชำนาญการพิเศษ",4,"Oncology Pharmacy","2008-06-02",49,7,4],
-  ["ภก.ภาณุพงศ์ วิริยะกุล","เภสัชกรปฏิบัติการ",3,"Outpatient Services","2024-06-03",9,0,0]
+// [name, position, trackIndex, sub-unit, start date (ISO), employment type]
+const RAW = [];
+
+// Position options, grouped for the roster sort order (เภสัชกร* > เจ้าพนักงานเภสัชกรรม* > อื่นๆ).
+const POSITION_OPTIONS = [
+  "เภสัชกร", "เภสัชกรปฏิบัติการ", "เภสัชกรชำนาญการ", "เภสัชกรชำนาญการพิเศษ", "เภสัชกรเชี่ยวชาญ",
+  "เจ้าพนักงานเภสัชกรรมปฏิบัติงาน", "เจ้าพนักงานเภสัชกรรมชำนาญงาน", "เจ้าพนักงานเภสัชกรรมอาวุโส",
+  "เจ้าหน้าที่ประจำห้องยา"
+];
+const EMP_OPTIONS = ["ข้าราชการ", "พนักงานราชการ", "ลูกจ้างชั่วคราว"];
+const CONF_BUDGET_OPTIONS = ["งบพัฒนาบุคลากร", "งบกลุ่มงาน", "โควตาแหล่งฝึก", "ผู้เข้าร่วมออกค่าใช้จ่ายเอง", "ไม่มีค่าใช้จ่าย"];
+
+const ALUMNI_REASONS = [
+  ["เกษียณอายุราชการ", "ok"],
+  ["ลาออก", "out"],
+  ["โอนย้าย", "move"],
+  ["ลาศึกษาต่อ", "study"]
 ];
 
-const INT = ["Antimicrobial Stewardship","Oncology Pharmacy","Pharmacokinetics","Medication Safety","Health Informatics","R2R / วิจัยจากงานประจำ","Home Pharmaceutical Care","Palliative Care","Drug Information","LEAN / Process Improvement","การสอนและนิเทศนักศึกษา","Clinical Trial"];
-const STR = ["สื่อสารกับทีมสหวิชาชีพได้ดี","แม่นยำเรื่องการคำนวณขนาดยา","เป็นวิทยากรภายในกลุ่มงาน","พัฒนา Dashboard ข้อมูลยา","จัดการงานเอกสารคุณภาพ","เป็นพี่เลี้ยงน้องใหม่","แก้ปัญหาเฉพาะหน้าได้ดี","ทำสื่อให้ความรู้ผู้ป่วย"];
-const DEV = ["ภาษาอังกฤษเชิงวิชาการ","สถิติและการวิเคราะห์ข้อมูล","ทักษะการนำเสนอ","การเขียนบทความวิจัย","การบริหารทีม","การใช้ Power BI / R","การให้คำปรึกษาผู้ป่วยเชิงลึก"];
-
-const COURSE = [
-  ["การบริหารยาเคมีบำบัดอย่างปลอดภัย","สมาคมเภสัชกรรมโรงพยาบาล",12,"อบรม"],
-  ["Antimicrobial Stewardship Program Workshop","คณะเภสัชศาสตร์ ม.มหิดล",16,"อบรม"],
-  ["ประชุมวิชาการเภสัชกรรมโรงพยาบาลแห่งประเทศไทย","สมาคมเภสัชกรรมโรงพยาบาล",18,"ประชุมวิชาการ"],
-  ["Basic Pharmacokinetics for Clinical Pharmacist","สภาเภสัชกรรม",9,"อบรม"],
-  ["การพัฒนาคุณภาพตามมาตรฐาน HA","สรพ.",14,"อบรม"],
-  ["R2R: การวิจัยจากงานประจำสู่งานวิจัย","กรมการแพทย์",8,"อบรม"],
-  ["Warfarin Clinic Update 2569","รพ.เลิดสิน",6,"ประชุมภายใน"],
-  ["Medication Reconciliation Refresher","กลุ่มงานเภสัชกรรม",3,"ประชุมภายใน"],
-  ["Data Visualization for Healthcare","สถาบันพระบรมราชชนก",12,"อบรม"],
-  ["Palliative Care in Oncology Patients","กรมการแพทย์",10,"ประชุมวิชาการ"],
-  ["Sterile Compounding Competency Renewal","กลุ่มงานเภสัชกรรม",7,"ประชุมภายใน"],
-  ["Pharmacist-led Clinic: หลักการและการประเมินผล","กรมการแพทย์",11,"อบรม"]
-];
-
-const TALK = [
-  ["การใช้ยา High Alert Drug อย่างปลอดภัย","อบรมพยาบาลใหม่ รพ.เลิดสิน"],
-  ["การให้คำแนะนำผู้ป่วยที่ได้รับ Warfarin","ประชุมวิชาการภายในกลุ่มงาน"],
-  ["Antimicrobial Stewardship ในหอผู้ป่วยศัลยกรรม","คณะกรรมการ AMS โรงพยาบาล"],
-  ["การเตรียมยาเคมีบำบัดและการจัดการสารรั่วไหล","อบรมเชิงปฏิบัติการ กลุ่มงานเภสัชกรรม"],
-  ["การอ่านและใช้ข้อมูล ADR ในเวชปฏิบัติ","ประชุมสหวิชาชีพ รพ.เลิดสิน"],
-  ["การใช้ Dashboard ข้อมูลยาเพื่อการตัดสินใจ","สัมมนาสารสนเทศ กรมการแพทย์"]
-];
-
-const RES = [
-  ["ผลของการให้คำปรึกษาโดยเภสัชกรต่อค่า INR ที่อยู่ในช่วงเป้าหมาย","ผู้วิจัยหลัก","ตีพิมพ์ 2567"],
-  ["ความคลาดเคลื่อนทางยาในหอผู้ป่วยอายุรกรรมและแนวทางป้องกัน","ผู้ร่วมวิจัย","ตีพิมพ์ 2568"],
-  ["การพัฒนาระบบเตือนปฏิกิริยาระหว่างยาในระบบสารสนเทศโรงพยาบาล","ผู้วิจัยหลัก","กำลังดำเนินการ"],
-  ["ผลลัพธ์ทางคลินิกของคลินิกโรคหืดที่มีเภสัชกรร่วมดูแล","ผู้ร่วมวิจัย","ส่งตีพิมพ์"],
-  ["ต้นทุน-ประสิทธิผลของการเตรียมยาเคมีบำบัดแบบรวมศูนย์","ผู้วิจัยหลัก","กำลังดำเนินการ"],
-  ["ความพึงพอใจของผู้ป่วยต่อบริการให้คำปรึกษาด้านยาทางไกล","ผู้ร่วมวิจัย","ตีพิมพ์ 2568"]
-];
-
-const IDPGOAL = [
-  ["ผ่านการรับรองสมรรถนะ Board Certified ด้านเภสัชบำบัด","สอบวัดความรู้ + ฝึกปฏิบัติที่หน่วยฝึก 4 สัปดาห์"],
-  ["เป็นผู้รับผิดชอบหลักคลินิกเฉพาะโรคของกลุ่มงาน","ฝึกปฏิบัติงานร่วมกับพี่เลี้ยง 6 เดือน + นำเสนอ case conference"],
-  ["ตีพิมพ์ผลงานวิจัย R2R 1 เรื่อง","อบรมสถิติ + เขียน manuscript ร่วมกับที่ปรึกษา"],
-  ["เป็นวิทยากรภายในโรงพยาบาลอย่างน้อย 2 เรื่อง/ปี","พัฒนาสื่อการสอน + ฝึกการนำเสนอ"],
-  ["พัฒนาระบบสารสนเทศสนับสนุนงานเภสัชกรรม","อบรม Data Analytics + ทำโครงการนำร่อง 1 ระบบ"],
-  ["ผ่านการประเมินสมรรถนะ Sterile Compounding ระดับสูง","ฝึกอบรม + สอบ media fill test"]
-];
-
-const CONFS_SEED = [
-  ["ประชุมวิชาการเภสัชกรรมโรงพยาบาลแห่งประเทศไทย ครั้งที่ 39","สมาคมเภสัชกรรมโรงพยาบาล (ประเทศไทย)","14–16 ต.ค. 2569","โรงแรมเซ็นทาราแกรนด์ กรุงเทพฯ","4,500 บาท",18],
-  ["Advanced Oncology Pharmacy Practice Workshop","คณะเภสัชศาสตร์ มหาวิทยาลัยมหิดล","5–7 พ.ย. 2569","คณะเภสัชศาสตร์ ม.มหิดล","3,200 บาท",16],
-  ["Anticoagulation Stewardship Forum 2026","ชมรมเภสัชกรโรคหัวใจและหลอดเลือด","21 พ.ย. 2569","โรงแรมแอมบาสซาเดอร์ กรุงเทพฯ","1,800 บาท",7],
-  ["อบรมเชิงปฏิบัติการ Pharmacy Informatics และ AI ในงานเภสัชกรรม","กรมการแพทย์ กระทรวงสาธารณสุข","3–4 ธ.ค. 2569","กรมการแพทย์","ไม่มีค่าลงทะเบียน",12]
-];
-
-const ALUMNI = [
-  ["ภญ.สุกัญญา อารีรักษ์","เภสัชกรชำนาญการพิเศษ","งานเภสัชกรรมคลินิก","1 มิ.ย. 2540","30 ก.ย. 2568","28 ปี 4 เดือน","เกษียณอายุราชการ","ok"],
-  ["ภก.ประเสริฐ วัฒนไชย","เภสัชกรเชี่ยวชาญ","งานบริหารเวชภัณฑ์","16 พ.ค. 2535","30 ก.ย. 2566","31 ปี 5 เดือน","เกษียณอายุราชการ","ok"],
-  ["ภญ.ธิดารัตน์ ชูสกุล","เภสัชกรชำนาญการ","งานเภสัชกรรมคลินิก","1 ก.ค. 2558","31 มี.ค. 2567","8 ปี 9 เดือน","โอนย้าย – รพ.ราชวิถี","move"],
-  ["ภก.ณรงค์ฤทธิ์ บุญเรือง","เภสัชกรชำนาญการ","งานผลิตยาปราศจากเชื้อ","1 ก.พ. 2557","15 ส.ค. 2567","10 ปี 6 เดือน","ลาออก – ภาคเอกชน","out"],
-  ["ภญ.พัชรินทร์ สุขสมบูรณ์","เภสัชกรปฏิบัติการ","งานบริการเภสัชกรรม","3 พ.ค. 2564","31 ต.ค. 2566","2 ปี 6 เดือน","ลาออก – ศึกษาต่อปริญญาโท","study"],
-  ["จพ.บุญมี ทองสุข","เจ้าพนักงานเภสัชกรรมอาวุโส","งานบริการเภสัชกรรม","1 ต.ค. 2531","30 ก.ย. 2565","34 ปี","เกษียณอายุราชการ","ok"],
-  ["ภก.วรากร นิลเขต","เภสัชกรปฏิบัติการ","งานสารสนเทศเภสัชกรรม","1 ส.ค. 2565","31 ก.ค. 2567","2 ปี","โอนย้าย – รพ.นพรัตนราชธานี","move"],
-  ["ภญ.มนัสนันท์ ศรีทอง","เภสัชกรชำนาญการ","งานคุณภาพและความเสี่ยง","1 พ.ย. 2555","31 ม.ค. 2568","12 ปี 3 เดือน","ลาออก – ประกอบธุรกิจส่วนตัว","out"]
-];
-
-const APPR_SEED = [
-  [1,"ประชุมวิชาการเภสัชกรรมโรงพยาบาลแห่งประเทศไทย ครั้งที่ 39","14–16 ต.ค. 69","4,500","ลส 0432/1189","อนุมัติ"],
-  [4,"Advanced Oncology Pharmacy Practice Workshop","5–7 พ.ย. 69","3,200","ลส 0432/1204","อนุมัติ"],
-  [2,"อบรม Sterile Compounding Competency Renewal","22 ก.ย. 69","1,500","ลส 0432/1176","อนุมัติ"],
-  [6,"อบรมเชิงปฏิบัติการ Pharmacy Informatics และ AI","3–4 ธ.ค. 69","ไม่มีค่าใช้จ่าย","–","รอบันทึกผล"],
-  [8,"Antimicrobial Stewardship Forum ภาคกลาง","28 ส.ค. 69","2,000","ลส 0432/1152","ไม่อนุมัติ"],
-  [16,"Nephrology Pharmacy Update 2026","19 ก.ย. 69","2,400","–","รอบันทึกผล"],
-  [13,"อบรมการจัดการความรู้และการเขียนคู่มือปฏิบัติงาน","9 ต.ค. 69","1,200","ลส 0432/1198","อนุมัติ"],
-  [20,"Quality Improvement in Pharmacy Practice","25 ก.ย. 69","1,900","–","รอบันทึกผล"],
-  [23,"Data Analytics for Hospital Pharmacy","12–13 พ.ย. 69","3,800","ลส 0432/1210","อนุมัติ"],
-  [34,"Ambulatory Diabetes Care Conference","30 ต.ค. 69","2,600","–","รอบันทึกผล"]
-];
+const CONFS_SEED = [];
+const ALUMNI = [];
+const APPR_SEED = [];
 
 const STAGE_NOTES = ["บรรจุเข้ารับราชการ / ผ่านทดลองงาน","ผ่านประเมินสมรรถนะระดับชำนาญการ","ผ่านผลงานวิชาการระดับชำนาญการพิเศษ","ผลงานเชิงประจักษ์ระดับเชี่ยวชาญ"];
 
@@ -264,10 +190,9 @@ const LOGIN_ROLES = [
 // LOGIN_ROLES' Thai labels above so a successful login can be mapped back to a role key.
 const DEFAULT_USERS = [
   ["2140009", "ภญ.ฐิติมา บันฑิตเจริญสิน", "หัวหน้ากลุ่มงาน", "LS123456", "ใช้งานอยู่", "ยังไม่เคยเข้าใช้งาน"],
-  ["2140227", "ภก.กิตติพัทธ์ เทวาภวัต", "ผู้ดูแลระบบ (Admin)", "LS123456", "ใช้งานอยู่", "ยังไม่เคยเข้าใช้งาน"],
-  ["2140226", "ภก.ชวิน ธรรมโกมุท", "ผู้ดูแลระบบ (Admin)", "LS123456", "ใช้งานอยู่", "ยังไม่เคยเข้าใช้งาน"],
-  ["2140249", "น.ส.อินทุกานต์ แสงจินดา", "เลขากลุ่มงาน", "LS123456", "ใช้งานอยู่", "ยังไม่เคยเข้าใช้งาน"],
-  ["2140999", "Admin", "ผู้ดูแลระบบ (Admin)", "LS123456", "ใช้งานอยู่", "ยังไม่เคยเข้าใช้งาน"]
+  ["2140227A", "ภก.กิตติพัทธ์ เทวาภวัต", "ผู้ดูแลระบบ (Admin)", "LS123456", "ใช้งานอยู่", "ยังไม่เคยเข้าใช้งาน"],
+  ["2140226A", "ภก.ชวิน ธรรมโกมุท", "ผู้ดูแลระบบ (Admin)", "LS123456", "ใช้งานอยู่", "ยังไม่เคยเข้าใช้งาน"],
+  ["2140249", "น.ส.อินทุกานต์ แสงจินดา", "เลขากลุ่มงาน", "LS123456", "ใช้งานอยู่", "ยังไม่เคยเข้าใช้งาน"]
 ];
 
 const DEF_TARGETS = { hours: 40, cpe: 30, talks: 2, res: 1, late: 12, vacJr: 10, vacSr: 20, idp: 80 };
@@ -275,7 +200,7 @@ const DEF_TARGETS = { hours: 40, cpe: 30, talks: 2, res: 1, late: 12, vacJr: 10,
 const NAV = {
   chief: [["ภาพรวม", [["dash", "Dashboard พัฒนาบุคลากร", ""], ["people", "ข้อมูลบุคลากร", "40"]]], ["การพัฒนาและวิจัย", [["idp", "แผน IDP รายบุคคล", "40"], ["attend", "ขาด ลา มาสาย", ""]]]],
   staff: [["ของฉัน", [["me", "โปรไฟล์ของฉัน", ""]]]],
-  sec: [["งานประจำวัน", [["daily", "บันทึกมาปฏิบัติงาน", ""], ["appr", "ผลอนุมัติไปประชุม", "4"]]], ["ทะเบียนบุคลากร", [["roster", "รายชื่อบุคลากรปัจจุบัน", "40"], ["alumni", "ประวัติผู้เคยปฏิบัติงาน", "8"]]]],
+  sec: [["งานประจำวัน", [["daily", "บันทึกมาปฏิบัติงาน", ""], ["appr", "ผลอนุมัติไปประชุม", "4"], ["leave_report", "รายงานวันลารายเดือน", ""]]], ["ทะเบียนบุคลากร", [["roster", "รายชื่อบุคลากรปัจจุบัน", "40"], ["alumni", "ประวัติผู้เคยปฏิบัติงาน", "8"]]]],
   admin: [["จัดการข้อมูลหลัก", [["adm_people", "ทะเบียนบุคลากร", ""], ["adm_conf", "งานประชุม / คอร์สอบรม", ""]]], ["ตั้งค่าระบบ", [["adm_target", "เป้าหมายและ KPI", ""], ["adm_user", "สิทธิ์ผู้ใช้งาน", ""]]]]
 };
 
@@ -288,6 +213,7 @@ const TITLES = {
   me: ["โปรไฟล์ของฉัน", "รายงานการพัฒนาตนเอง ความสนใจ และสิทธิวันลา"],
   daily: ["บันทึกการมาปฏิบัติงานรายวัน", "เลขากลุ่มงาน · บันทึกสถานะรายบุคคลทุกวันทำการ"],
   appr: ["ผลการอนุมัติไปประชุม / อบรม", "บันทึกผลจากหนังสือตอบกลับ เพื่อเข้าแฟ้มพัฒนาบุคลากร"],
+  leave_report: ["รายงานวันลารายเดือน", "สรุปจำนวนครั้ง/วันที่บันทึกจากหน้าบันทึกมาปฏิบัติงานรายวัน"],
   roster: ["ทะเบียนรายชื่อบุคลากร", "วันเริ่มปฏิบัติงาน ประเภทการจ้าง และอายุงาน"],
   alumni: ["ประวัติผู้ที่เคยปฏิบัติงาน", "ข้อมูลย้อนหลังของผู้ที่ลาออก โอนย้าย และเกษียณ"],
   adm_people: ["จัดการทะเบียนบุคลากร", "เพิ่ม แก้ไข และกำหนดรายชื่อบุคลากรในกลุ่มงาน"],
@@ -297,7 +223,9 @@ const TITLES = {
 };
 
 // ==== js\model.js ====
-// Pure helper functions + the "build people" derivation, ported 1:1 from the design mockup's logic.
+// Pure helper functions + the "build people" derivation. Courses/talks/research/IDP/
+// tags/aspirations are read from real per-person records in state (added through the
+// app), NOT fabricated — this deployment records real data, not mockup demo data.
 const Model = (() => {
 
   function ini(name) {
@@ -315,6 +243,20 @@ const Model = (() => {
 
   function stageName(i) {
     return ["ระดับปฏิบัติการ", "ระดับชำนาญการ", "ระดับชำนาญการพิเศษ", "ระดับเชี่ยวชาญ"][i];
+  }
+
+  // Roster sort order: เภสัชกร* first, then เจ้าพนักงานเภสัชกรรม*, everything else last.
+  function positionGroup(pos) {
+    if (pos.indexOf("เภสัชกร") === 0) return 0;
+    if (pos.indexOf("เจ้าพนักงานเภสัชกรรม") === 0) return 1;
+    return 2;
+  }
+  function sortPeople(list) {
+    return list.slice().sort((a, b) =>
+      positionGroup(a.pos) - positionGroup(b.pos) ||
+      a.stageIdx - b.stageIdx ||
+      a.name.localeCompare(b.name, "th")
+    );
   }
 
   function hash(i, s) {
@@ -342,6 +284,24 @@ const Model = (() => {
     return ["ต้องพัฒนา", "background:#fbe9e7;color:#8f231b"];
   }
 
+  function trackShortLabel(name) {
+    return name.replace(" (IV Admixture)", " · IV").replace(" (Chemotherapy)", " · Chemo").replace("Pharmaceutical ", "").replace("Pharmacy ", "");
+  }
+
+  function getTracks(state) { return (state && state.tracks) || TRACKS; }
+
+  // Real per-day attendance/leave history: state.daily = { [dateISO]: { [personId]: status } }.
+  const LEAVE_STATUSES = ["vacation", "sick", "personal", "late", "trip"];
+  function countLeave(state, personId) {
+    const daily = state.daily || {};
+    const counts = { vacation: 0, sick: 0, personal: 0, late: 0, trip: 0 };
+    Object.keys(daily).forEach(dateKey => {
+      const status = (daily[dateKey] || {})[personId];
+      if (LEAVE_STATUSES.indexOf(status) >= 0) counts[status]++;
+    });
+    return counts;
+  }
+
   let cache = null, cacheN = -1;
 
   function build(state) {
@@ -349,89 +309,74 @@ const Model = (() => {
     if (cache && cacheN === raw.length) return cache;
     cacheN = raw.length;
     const deletedSet = new Set(state.deletedIds || []);
+    const tracks = getTracks(state);
     const TG = state.targets || DEF_TARGETS;
+    const coursesBy = state.coursesByPerson || {};
+    const talksBy = state.talksByPerson || {};
+    const researchBy = state.researchByPerson || {};
+    const idpBy = state.idpByPerson || {};
+    const tagsBy = state.tagsByPerson || {};
+    const aspireBy = state.aspireByPerson || {};
 
     cache = raw.map((r, i) => {
-      const [name, pos, ti, sub, start, hours, talks, research] = r;
-      const tr = TRACKS[ti], si = stageIdx(pos), h = hash(i, 3);
-      const prog = 28 + (h % 62);
-      const kpi = kpiOf(hours, talks, research, prog);
+      const [name, pos, ti, sub, start, emp] = r;
+      const tr = tracks[ti] || tracks[0] || ["-", "-", "#5c6b67"];
+      const si = stageIdx(pos);
       const yr = 2026 - new Date(start).getFullYear();
+
+      const courses = (coursesBy[i] || []).slice();
+      const hours = courses.reduce((a, c) => a + (parseInt(c.hours, 10) || 0), 0);
+      const cpe = Math.round(hours * 0.72);
+      const talks = (talksBy[i] || []).slice();
+      const research = (researchBy[i] || []).slice();
+      const idp = (idpBy[i] || []).slice();
+      const idpDone = idp.filter(d => d.pct >= 100).length;
+      const idpTotal = idp.length;
+      const idpPct = idpTotal ? Math.round(idp.reduce((a, d) => a + (d.pct || 0), 0) / idpTotal) : 0;
+      const prog = idpPct;
+      const kpi = kpiOf(hours, talks.length, research.length, prog);
+      const tg = tagsBy[i] || {};
+      const asp = aspireBy[i] || {};
+
       const p = {
-        id: i, name, pos, unit: tr[1], track: tr[0],
-        trackShort: tr[0].replace(" (IV Admixture)", " · IV").replace(" (Chemotherapy)", " · Chemo").replace("Pharmaceutical ", "").replace("Pharmacy ", ""),
+        id: i, name, pos, unit: tr[1], track: tr[0], trackShort: trackShortLabel(tr[0]),
         sub, color: tr[2], ini: ini(name), avaBg: "background:" + tr[2],
         progBg: "background:" + tr[2], prog, stage: stageName(si), stageIdx: si,
         start, startTh: thDate(start), tenure: tenure(start),
-        hours, cpe: Math.round(hours * 0.72), talkCount: talks, resCount: research,
-        kpi: kpi[0], kpiStyle: kpi[1], kpiNote: "ชม.อบรม " + Math.round(hours / 40 * 100) + "% ของเป้า · IDP " + prog + "%",
-        license: "ภ." + (12000 + hash(i, 9) * 3),
-        boss: i === 0 ? "ผู้อำนวยการโรงพยาบาล" : "ภญ.ศิริพร วงศ์สถาพร",
-        emp: si >= 1 || yr > 6 ? "ข้าราชการ" : (i % 5 === 0 ? "พนักงานราชการ" : "ข้าราชการ"),
-        interests: [INT[h % 12], INT[(h + 5) % 12], INT[(h + 9) % 12]],
-        strengths: [STR[h % 8], STR[(h + 3) % 8]],
-        develop: [DEV[h % 7], DEV[(h + 4) % 7]],
-        aspire: "ต้องการเติบโตสาย " + tr[0] + " ด้าน " + sub + " โดยตั้งเป้าเป็นผู้รับผิดชอบของงานภายใน " + (si >= 2 ? "1 ปี" : "2–3 ปี") + " และพัฒนาผลงานวิชาการเพื่อประเมินระดับที่สูงขึ้น",
-        gapComp: [DEV[h % 7], DEV[(h + 2) % 7]].join(", "),
-        readyBy: "ไตรมาส " + (1 + h % 4) + "/" + (2570 + h % 3)
+        hours, cpe, talkCount: talks.length, resCount: research.length,
+        kpi: kpi[0], kpiStyle: kpi[1], kpiNote: "ชม.อบรม " + hours + " ชม. · IDP " + prog + "%",
+        emp: emp || "ข้าราชการ",
+        interests: tg.int || [], strengths: tg.str || [], develop: tg.dev || [],
+        aspire: asp.note || "", aspireTrack: asp.track || tr[0], aspireSub: asp.sub || sub, aspireYear: asp.year || "ภายใน 2 ปี",
+        gapComp: "ยังไม่ได้ประเมิน", readyBy: "ยังไม่กำหนด"
       };
-      const nc = 3 + (h % 4);
-      p.courses = [];
-      for (let k = 0; k < nc; k++) {
-        const c = COURSE[(h + k * 5) % 12], mo = (h + k * 3) % 11;
-        p.courses.push({ date: (2 + (h + k) % 26) + " " + TH_M[mo] + " 69", title: c[0], org: c[1], hours: c[2], type: c[3] });
-      }
-      p.courseCount = nc;
-      p.talks = [];
-      for (let k = 0; k < Math.min(talks, 3); k++) {
-        const t = TALK[(h + k * 2) % 6];
-        p.talks.push({ topic: t[0], venue: t[1], date: TH_M[(h + k * 4) % 12] + " 69", aud: (25 + (h + k * 13) % 60) + " คน" });
-      }
-      p.noTalks = talks === 0;
-      p.research = [];
-      for (let k = 0; k < Math.min(research, 3); k++) {
-        const s = RES[(h + k * 3) % 6];
-        p.research.push({ title: s[0], role: s[1], status: s[2], chip: s[2].indexOf("ตีพิมพ์") === 0 ? "background:#e3f1ee;color:#0a4f43" : "background:#fdf1e0;color:#8a5310" });
-      }
-      p.noResearch = research === 0;
-      const ni = 2 + (h % 2);
-      p.idp = [];
-      let done = 0;
-      for (let k = 0; k < ni; k++) {
-        const g = IDPGOAL[(h + k * 4) % 6], pct = Math.min(100, 20 + (h + k * 37) % 85);
-        const st = pct >= 100 ? "ครบถ้วนแล้ว" : pct >= 45 ? "กำลังดำเนินการ" : "เริ่มต้น";
-        if (pct >= 100) done++;
-        p.idp.push({
-          goal: g[0], action: g[1], pct, period: "ไตรมาส " + (1 + k) + "–" + (2 + k) + "/69", status: st,
-          chip: pct >= 100 ? "background:#e3f1ee;color:#0a4f43" : pct >= 45 ? "background:#e6eef7;color:#2a5f8f" : "background:#f2f5f4;color:#5c6b67",
-          bar: "background:" + (pct >= 100 ? "#0e6b5b" : pct >= 45 ? "#2a5f8f" : "#a9640f")
-        });
-      }
-      p.idpDone = done; p.idpTotal = ni;
-      p.idpPct = Math.round(p.idp.reduce((a, b) => a + b.pct, 0) / ni);
-      p.mentor = i === 0 ? "ผอ.รพ." : (si >= 2 ? "ภญ.ศิริพร วงศ์สถาพร" : RAW[(i + 1) % 40][0]);
+      p.courses = courses; p.courseCount = courses.length;
+      p.talks = talks; p.noTalks = talks.length === 0;
+      p.research = research; p.noResearch = research.length === 0;
+      p.idp = idp; p.idpDone = idpDone; p.idpTotal = idpTotal; p.idpPct = idpPct;
+      p.mentor = "ยังไม่ระบุ";
       p.stages = [0, 1, 2, 3].map(k => {
         const cur = k === si, past = k < si;
         return {
           name: stageName(k) + (cur ? " (ปัจจุบัน)" : ""),
-          note: k === si + 1 ? "เป้าหมายถัดไป · " + p.readyBy : STAGE_NOTES[k],
+          note: k === si + 1 ? "รอประเมินสมรรถนะเมื่อครบเกณฑ์" : STAGE_NOTES[k],
           dot: past ? "background:" + tr[2] : cur ? "background:#fff;border:3px solid " + tr[2] : "background:#dde5e2",
           line: k === 3 ? "background:transparent" : (past ? "background:" + tr[2] : "background:#dde5e2"),
           txt: past || cur ? "color:#14201d" : "color:#8a968f"
         };
       });
-      const vacTotal = yr >= 10 ? TG.vacSr : TG.vacJr, vacUsed = h % Math.max(2, vacTotal - 2);
-      const lateUsed = h % 9, sickUsed = (h + 3) % 7, perUsed = (h + 5) % 6;
-      p.leave = { vacTotal, vacUsed, lateUsed, sickUsed, perUsed };
-      p.vacLeft = vacTotal - vacUsed; p.lateUsed = lateUsed; p.lateLeft = TG.late - lateUsed; p.latePct = Math.round(lateUsed / TG.late * 100);
+
+      const leaveCounts = countLeave(state, i);
+      const vacTotal = yr >= 10 ? TG.vacSr : TG.vacJr;
+      p.vacLeft = vacTotal - leaveCounts.vacation;
+      p.lateUsed = leaveCounts.late; p.lateLeft = TG.late - leaveCounts.late;
+      p.latePct = TG.late ? Math.round(leaveCounts.late / TG.late * 100) : 0;
       p.leaveRows = [
-        { label: "ลาพักผ่อน", txt: vacUsed + "/" + vacTotal + " วัน", pct: Math.round(vacUsed / vacTotal * 100), bar: "background:#0f7a86" },
-        { label: "ลากิจส่วนตัว", txt: perUsed + "/45 วัน", pct: Math.round(perUsed / 45 * 100), bar: "background:#2a5f8f" },
-        { label: "ลาป่วย", txt: sickUsed + "/60 วัน", pct: Math.round(sickUsed / 60 * 100), bar: "background:#5d4a9c" },
-        { label: "ลาคลอด", txt: (i % 17 === 5 ? "90/90 วัน" : "0/90 วัน"), pct: i % 17 === 5 ? 100 : 0, bar: "background:#a9640f" },
-        { label: "ลาศึกษาต่อ", txt: (i % 19 === 7 ? "อยู่ระหว่างลา" : "ไม่มี"), pct: i % 19 === 7 ? 100 : 0, bar: "background:#6b7a1e" },
-        { label: "มาสาย", txt: lateUsed + "/" + TG.late + " ครั้ง", pct: Math.round(lateUsed / TG.late * 100), bar: "background:#c9821c" },
-        { label: "ขาดงาน", txt: (h % 23 === 1 ? "1 วัน" : "ไม่มี"), pct: h % 23 === 1 ? 8 : 0, bar: "background:#b0332a" }
+        { label: "ลาพักผ่อน", txt: leaveCounts.vacation + "/" + vacTotal + " วัน", pct: vacTotal ? Math.round(leaveCounts.vacation / vacTotal * 100) : 0, bar: "background:#0f7a86" },
+        { label: "ลาป่วย", txt: leaveCounts.sick + " วัน", pct: Math.min(100, leaveCounts.sick * 3), bar: "background:#5d4a9c" },
+        { label: "ลากิจ", txt: leaveCounts.personal + " วัน", pct: Math.min(100, leaveCounts.personal * 3), bar: "background:#2a5f8f" },
+        { label: "มาสาย", txt: leaveCounts.late + "/" + TG.late + " ครั้ง", pct: p.latePct, bar: "background:#c9821c" },
+        { label: "ไปประชุมนอกสถานที่", txt: leaveCounts.trip + " วัน", pct: Math.min(100, leaveCounts.trip * 5), bar: "background:#1d6fa5" }
       ];
       p.deleted = deletedSet.has(p.id);
       return p;
@@ -441,12 +386,12 @@ const Model = (() => {
 
   function invalidate() { cacheN = -1; }
 
-  return { ini, stageIdx, stageName, hash, thDate, tenure, kpiOf, build, invalidate };
+  return { ini, stageIdx, stageName, positionGroup, sortPeople, hash, thDate, tenure, kpiOf, trackShortLabel, getTracks, countLeave, build, invalidate };
 })();
 
 // ==== js\store.js ====
 // Central mutable state. Everything persists to this browser's local storage; the
-// SHARED_KEYS subset also syncs through RemoteSync (Firestore) when that's configured,
+// SHARED_KEYS subset also syncs through RemoteSync (Supabase) when that's configured,
 // so multiple computers can see the same roster/records — see remote-sync.js.
 const Store = (() => {
   const STORAGE_KEY = "pharmhr.state.v1";
@@ -455,29 +400,29 @@ const Store = (() => {
     auth: false, loginRole: "chief", loginId: "", loginPw: "", loginErr: false, loginErrMsg: "", remember: true,
     forgotOpen: false, forgotId: "", forgotPw1: "", forgotPw2: "", forgotMsg: "",
     currentUserId: null,
-    newPersons: [], deletedIds: [], confList: null, targets: null, admSaved: "", users: null, admQ: "",
-    role: "chief", page: "dash", tab: "overview", sel: 4, month: 7,
+    newPersons: [], deletedIds: [], confList: null, apprList: [], alumniList: [], targets: null, tracks: null,
+    admSaved: "", users: null, admQ: "",
+    role: "chief", page: "dash", tab: "overview", sel: 0, month: 7, reportMonth: "2026-08",
     q: "", track: "ทุก Career Path", idpFilter: "ทั้งหมด",
-    extraCourses: [], extraTalks: [], extraRes: [],
-    tags: null, aspireTrack: "", aspireSub: "", aspireYear: "ภายใน 2 ปี", aspireNote: "", savedMsg: "",
-    conf: {}, daily: {}, dailySaved: false, dailyDate: "2026-08-26",
-    appr: {}, modal: null, form: {}
+    coursesByPerson: {}, talksByPerson: {}, researchByPerson: {}, idpByPerson: {},
+    tagsByPerson: {}, aspireByPerson: {}, savedMsg: "",
+    conf: {}, daily: {}, dailySavedDates: {}, dailyDate: "2026-08-26",
+    modal: null, form: {}, __contextPersonId: null
   });
 
   // Saved to this browser only (which page you're on, what's selected, open modals,
   // your own login session). Never pushed to or overwritten by other devices.
   const SESSION_KEYS = [
     "auth", "loginRole", "remember", "currentUserId",
-    "role", "page", "tab", "sel", "month", "q", "track", "idpFilter", "admQ"
+    "role", "page", "tab", "sel", "month", "reportMonth", "q", "track", "idpFilter", "admQ", "dailyDate"
   ];
 
   // The actual data: rosters, accounts, records — this is what should look the same
   // on every computer, so it's the part that syncs through RemoteSync.
   const SHARED_KEYS = [
-    "newPersons", "deletedIds", "confList", "targets", "users",
-    "extraCourses", "extraTalks", "extraRes", "tags",
-    "aspireTrack", "aspireSub", "aspireYear", "aspireNote",
-    "conf", "daily", "dailySaved", "dailyDate", "appr"
+    "newPersons", "deletedIds", "confList", "apprList", "alumniList", "targets", "tracks", "users",
+    "coursesByPerson", "talksByPerson", "researchByPerson", "idpByPerson", "tagsByPerson", "aspireByPerson",
+    "conf", "daily", "dailySavedDates"
   ];
 
   const PERSIST_KEYS = SESSION_KEYS.concat(SHARED_KEYS);
@@ -560,13 +505,14 @@ const Store = (() => {
 })();
 
 // ==== js\viewmodel.js ====
-// Computes the full "vals" view-model for the current state, exactly mirroring the
-// design mockup's renderVals(). Screen renderers consume this object read-only,
-// and call the closures it hands back (e.g. vals.setQ(e)) to mutate state.
+// Computes the full "vals" view-model for the current state. Screen renderers consume
+// this object read-only, and call the closures it hands back (e.g. vals.setQ(e)) to
+// mutate state.
 const VM = (() => {
 
   const ROLE_KEY_BY_LABEL = LOGIN_ROLES.reduce((m, r) => { m[r[1]] = r[0]; return m; }, {});
   const UNLINKED_PERSON = "- ยังไม่ผูกข้อมูลบุคลากร -";
+  const NONE_PERSON = "- เลือกบุคลากร -";
 
   function go(page, extra) { Store.setState(Object.assign({ page }, extra || {})); }
   function pill(on) { return on ? "background:#0e6b5b;color:#fff;border-color:#0e6b5b" : "background:#fff;color:#5c6b67"; }
@@ -585,54 +531,172 @@ const VM = (() => {
   }
   function setConfs(list) { Store.setState({ confList: list, admSaved: "" }); }
 
+  function getTracks(state) { return Model.getTracks(state); }
+  function setTracks(list) { Model.invalidate(); Store.setState({ tracks: list, admSaved: "" }); }
+
+  function getAppr(state) { return state.apprList || []; }
+  function setAppr(list) { Store.setState({ apprList: list }); }
+
+  function getAlumni(state) { return state.alumniList || []; }
+  function setAlumni(list) { Store.setState({ alumniList: list }); }
+
   function getUsers(state) {
     if (state.users) return state.users;
     return DEFAULT_USERS.map(u => ({ id: u[0], name: u[1], role: u[2], password: u[3], status: u[4], last: u[5] }));
   }
 
-  function tagState(state) {
-    const me = Model.build(state)[4];
-    return state.tags || { int: me.interests.slice(), str: me.strengths.slice(), dev: me.develop.slice(), d0: "", d1: "", d2: "" };
+  function tagState(state, personId) {
+    const t = (state.tagsByPerson || {})[personId];
+    return t || { int: [], str: [], dev: [], d0: "", d1: "", d2: "" };
   }
-  function setTags(state, patch) { Store.setState({ tags: Object.assign(tagState(state), patch) }); }
+  function setTags(state, personId, patch) {
+    const cur = tagState(state, personId);
+    Store.setState({ tagsByPerson: Object.assign({}, state.tagsByPerson, { [personId]: Object.assign({}, cur, patch) }) });
+  }
+
+  function aspireState(state, person) {
+    const a = (state.aspireByPerson || {})[person.id];
+    return a || { track: person.track, sub: person.sub, year: "ภายใน 2 ปี", note: person.aspire || "" };
+  }
+  function setAspire(state, personId, patch) {
+    const cur = (state.aspireByPerson || {})[personId] || {};
+    Store.setState({ aspireByPerson: Object.assign({}, state.aspireByPerson, { [personId]: Object.assign({}, cur, patch) }), savedMsg: "" });
+  }
 
   function openModal(kind, form) { Store.setState({ modal: kind, form: form || {} }); }
   function setForm(state, k, v) { Store.setState({ form: Object.assign({}, state.form, { [k]: v }) }); }
-  function fld(state, label, key, ph) { return { label, isText: true, isSelect: false, isFile: false, value: state.form[key] || "", ph: ph || "", set: e => setForm(state, key, e.target.value) }; }
-  function sel(state, label, key, options) { return { label, isSelect: true, isText: false, isFile: false, options, value: state.form[key] || options[0], set: e => setForm(state, key, e.target.value) }; }
-  function file(state, label, key) { return { label, isFile: true, isText: false, isSelect: false, value: state.form[key] || "เลือกไฟล์ / ลากไฟล์มาวาง (PDF, JPG)", set: () => setForm(state, key, "แนบแล้ว: certificate-2569.pdf") }; }
+  function fld(state, label, key, ph) { return { label, isText: true, isSelect: false, isFile: false, isDate: false, value: state.form[key] || "", ph: ph || "", set: e => setForm(state, key, e.target.value) }; }
+  function sel(state, label, key, options) { return { label, isSelect: true, isText: false, isFile: false, isDate: false, options, value: state.form[key] || options[0], set: e => setForm(state, key, e.target.value) }; }
+  function dateFld(state, label, key) { return { label, isDate: true, isText: false, isSelect: false, isFile: false, value: state.form[key] || "", set: e => setForm(state, key, e.target.value) }; }
+  function dateRange(state, label, keyStart, keyEnd) {
+    return [dateFld(state, label + " (เริ่ม)", keyStart), dateFld(state, label + " (สิ้นสุด)", keyEnd)];
+  }
+  function file(state, label, key) {
+    return {
+      label, isFile: true, isText: false, isSelect: false, isDate: false,
+      value: state.form[key] || "ยังไม่ได้แนบไฟล์",
+      set: async e => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        if (typeof RemoteSync !== "undefined" && RemoteSync.uploadFile) {
+          const url = await RemoteSync.uploadFile(f);
+          setForm(state, key, url || ("แนบแล้ว: " + f.name));
+        } else {
+          setForm(state, key, "แนบแล้ว: " + f.name);
+        }
+      }
+    };
+  }
+  function personSel(state, label, key, people, defaultName) {
+    const names = people.map(p => p.name);
+    return { label, isSelect: true, isText: false, isFile: false, isDate: false, options: [NONE_PERSON].concat(names), value: state.form[key] || defaultName || NONE_PERSON, set: e => setForm(state, key, e.target.value) };
+  }
 
   function saveModal(state) {
     const s = state, f = s.form;
+    const people = Model.build(state);
+    const activePeople = people.filter(p => !p.deleted);
+    const findPerson = name => activePeople.find(p => p.name === name);
+
     if (s.modal === "train") {
-      const c = { date: f.date || "26 ส.ค. 69", title: f.title || "(ไม่ระบุชื่อหลักสูตร)", org: f.org || "-", type: f.type || "อบรม", hours: f.hours || "0", status: "รอตรวจสอบ", chip: "background:#fdf1e0;color:#8a5310" };
-      Store.setState({ extraCourses: [c].concat(s.extraCourses), modal: null, form: {} });
+      const meId = s.__contextPersonId;
+      const dateLabel = (f.dateStart || "") + (f.dateEnd && f.dateEnd !== f.dateStart ? "–" + f.dateEnd : "");
+      const c = { date: dateLabel || "-", title: f.title || "(ไม่ระบุชื่อหลักสูตร)", org: f.org || "-", type: f.type || "อบรม", status: "รอตรวจสอบ", chip: "background:#fdf1e0;color:#8a5310" };
+      const list = (s.coursesByPerson[meId] || []).slice();
+      list.unshift(c);
+      Store.setState({ coursesByPerson: Object.assign({}, s.coursesByPerson, { [meId]: list }), modal: null, form: {} });
     } else if (s.modal === "talk") {
-      const t = { topic: f.topic || "(ไม่ระบุหัวข้อ)", venue: f.venue || "-", date: f.date || "ส.ค. 69", aud: (f.aud || "0") + " คน" };
-      Store.setState({ extraTalks: [t].concat(s.extraTalks), modal: null, form: {} });
+      const meId = s.__contextPersonId;
+      const dateLabel = (f.dateStart || "") + (f.dateEnd && f.dateEnd !== f.dateStart ? "–" + f.dateEnd : "");
+      const t = { topic: f.topic || "(ไม่ระบุหัวข้อ)", venue: f.venue || "-", date: dateLabel || "-", doc: f.doc || "" };
+      const list = (s.talksByPerson[meId] || []).slice();
+      list.unshift(t);
+      Store.setState({ talksByPerson: Object.assign({}, s.talksByPerson, { [meId]: list }), modal: null, form: {} });
     } else if (s.modal === "res") {
-      const r = { title: f.title || "(ไม่ระบุชื่อเรื่อง)", role: f.role || "ผู้วิจัยหลัก", status: f.status || "กำลังดำเนินการ", chip: "background:#fdf1e0;color:#8a5310" };
-      Store.setState({ extraRes: [r].concat(s.extraRes), modal: null, form: {} });
+      const meId = s.__contextPersonId;
+      const r = { title: f.title || "(ไม่ระบุชื่อเรื่อง)", role: f.role || "ผู้วิจัยหลัก", status: f.status || "กำลังดำเนินการ", doc: f.doc || "", chip: "background:#fdf1e0;color:#8a5310" };
+      const list = (s.researchByPerson[meId] || []).slice();
+      list.unshift(r);
+      Store.setState({ researchByPerson: Object.assign({}, s.researchByPerson, { [meId]: list }), modal: null, form: {} });
     } else if (s.modal === "person") {
-      const ti = Math.max(0, TRACKS.findIndex(t => t[0] === (f.track || TRACKS[0][0])));
-      const iso = (f.start || "2569-09-01").replace(/^(\d{4})/, m => String(parseInt(m, 10) > 2400 ? parseInt(m, 10) - 543 : parseInt(m, 10)));
-      const row = [f.name || "(ไม่ระบุชื่อ)", f.pos || "เภสัชกรปฏิบัติการ", ti, f.sub || "-", /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : "2026-09-01", 0, 0, 0];
+      const tracks = getTracks(s);
+      const ti = Math.max(0, tracks.findIndex(t => t[0] === (f.track || tracks[0][0])));
+      const start = /^\d{4}-\d{2}-\d{2}$/.test(f.start || "") ? f.start : "2026-09-01";
+      const row = [f.name || "(ไม่ระบุชื่อ)", f.pos || "เภสัชกรปฏิบัติการ", ti, f.sub || "-", start, f.emp || "ข้าราชการ"];
       Model.invalidate();
-      Store.setState({ newPersons: (s.newPersons || []).concat([row]), modal: null, form: {}, admSaved: "เพิ่มบุคลากรใหม่เรียบร้อย · กรอกข้อมูลทุกหน้าอีกที่เกี่ยวข้องแล้ว" });
+      Store.setState({ newPersons: (s.newPersons || []).concat([row]), modal: null, form: {}, admSaved: "เพิ่มบุคลากรใหม่เรียบร้อย" });
     } else if (s.modal === "conf" || (s.modal || "").indexOf("conf:") === 0) {
       const list = getConfs(s).slice();
-      const item = { title: f.title || "(ไม่ระบุชื่องานประชุม)", org: f.org || "-", date: f.date || "-", place: f.place || "-", fee: f.fee || "ไม่มีค่าลงทะเบียน", cpe: parseInt(f.cpe, 10) || 0, seats: parseInt(f.seats, 10) || 1, budget: f.budget || "งบพัฒนาบุคลากร", pub: (f.pub || "เผยแพร่ทันที") === "เผยแพร่ทันที" };
+      const item = { title: f.title || "(ไม่ระบุชื่องานประชุม)", org: f.org || "-", date: f.date || "-", place: f.place || "-", fee: f.fee || "ไม่มีค่าลงทะเบียน", cpe: parseInt(f.cpe, 10) || 0, seats: parseInt(f.seats, 10) || 1, budget: f.budget || "งบพัฒนาบุคลากร", pub: true };
       if (s.modal === "conf") list.unshift(item); else list[parseInt(s.modal.slice(5), 10)] = item;
-      Store.setState({ confList: list, modal: null, form: {}, admSaved: s.modal === "conf" ? "เพิ่มงานประชุมเรียบร้อย" : "แก้ไขข้อมูลงานประชุมเรียบร้อย" });
+      Store.setState({ confList: list, modal: null, form: {}, admSaved: s.modal === "conf" ? "เพิ่มและเผยแพร่งานประชุมเรียบร้อย" : "แก้ไขข้อมูลงานประชุมเรียบร้อย" });
     } else if (s.modal === "user" || (s.modal || "").indexOf("user:") === 0) {
       const list = getUsers(s).slice();
       const item = { id: f.id || "-", name: f.name || "(ไม่ระบุชื่อ)", role: f.role || "บุคลากร", password: f.password || "LS123456", status: f.status || "ใช้งานอยู่", last: "ยังไม่เคยเข้าใช้งาน",
         personName: f.role === "บุคลากร" && f.personName && f.personName !== UNLINKED_PERSON ? f.personName : null };
       if (s.modal === "user") list.unshift(item); else { const k = parseInt(s.modal.slice(5), 10); item.last = list[k].last; list[k] = item; }
       Store.setState({ users: list, modal: null, form: {}, admSaved: "บันทึกสิทธิ์ผู้ใช้งานเรียบร้อย" });
-    } else if (s.modal && s.modal.indexOf("appr:") === 0) {
-      const id = s.modal.slice(5);
-      Store.setState({ appr: Object.assign({}, s.appr, { [id]: { status: f.result || "อนุมัติ", doc: f.doc || "ลส 0432/1215" } }), modal: null, form: {} });
+    } else if (s.modal === "track" || (s.modal || "").indexOf("track:") === 0) {
+      const list = getTracks(s).slice();
+      const item = [f.name || "(ไม่ระบุชื่อ)", f.unit || "-", f.color || TRACK_COLORS[list.length % TRACK_COLORS.length]];
+      if (s.modal === "track") list.push(item); else list[parseInt(s.modal.slice(6), 10)] = item;
+      setTracks(list);
+      Store.setState({ modal: null, form: {}, admSaved: s.modal === "track" ? "เพิ่มสาย Career Path เรียบร้อย" : "แก้ไขชื่อ Career Path เรียบร้อย" });
+    } else if (s.modal === "appr_new") {
+      const person = findPerson(f.personName);
+      if (!person) { Store.setState({ modal: null, form: {} }); return; }
+      const item = { personId: person.id, title: f.title || "(ไม่ระบุชื่องานประชุม)", date: f.date || "-", budget: f.budget || "-", doc: "", status: "รอบันทึกผล", file: "" };
+      setAppr([item].concat(getAppr(s)));
+      Store.setState({ modal: null, form: {} });
+    } else if ((s.modal || "").indexOf("appr_edit:") === 0) {
+      const idx = parseInt(s.modal.slice(10), 10);
+      const list = getAppr(s).slice();
+      list[idx] = Object.assign({}, list[idx], { status: f.result || "อนุมัติ", doc: f.doc || "", file: f.file || list[idx].file || "" });
+      setAppr(list);
+      Store.setState({ modal: null, form: {} });
+    } else if (s.modal === "idp_new") {
+      const person = findPerson(f.personName);
+      if (!person) { Store.setState({ modal: null, form: {} }); return; }
+      const pct = Math.max(0, Math.min(100, parseInt(f.pct, 10) || 0));
+      const status = pct >= 100 ? "ครบถ้วนแล้ว" : pct >= 45 ? "กำลังดำเนินการ" : "เริ่มต้น";
+      const goal = { goal: f.goal || "(ไม่ระบุเป้าหมาย)", action: f.action || "-", period: f.period || "-", pct, status,
+        chip: pct >= 100 ? "background:#e3f1ee;color:#0a4f43" : pct >= 45 ? "background:#e6eef7;color:#2a5f8f" : "background:#f2f5f4;color:#5c6b67",
+        bar: "background:" + (pct >= 100 ? "#0e6b5b" : pct >= 45 ? "#2a5f8f" : "#a9640f") };
+      const list = (s.idpByPerson[person.id] || []).slice();
+      list.push(goal);
+      Model.invalidate();
+      Store.setState({ idpByPerson: Object.assign({}, s.idpByPerson, { [person.id]: list }), modal: null, form: {} });
+    } else if ((s.modal || "").indexOf("idp_edit:") === 0) {
+      const parts = s.modal.split(":");
+      const pid = parseInt(parts[1], 10), idx = parseInt(parts[2], 10);
+      const pct = Math.max(0, Math.min(100, parseInt(f.pct, 10) || 0));
+      const status = pct >= 100 ? "ครบถ้วนแล้ว" : pct >= 45 ? "กำลังดำเนินการ" : "เริ่มต้น";
+      const list = (s.idpByPerson[pid] || []).slice();
+      list[idx] = Object.assign({}, list[idx], { goal: f.goal, action: f.action, period: f.period, pct, status,
+        chip: pct >= 100 ? "background:#e3f1ee;color:#0a4f43" : pct >= 45 ? "background:#e6eef7;color:#2a5f8f" : "background:#f2f5f4;color:#5c6b67",
+        bar: "background:" + (pct >= 100 ? "#0e6b5b" : pct >= 45 ? "#2a5f8f" : "#a9640f") });
+      Model.invalidate();
+      Store.setState({ idpByPerson: Object.assign({}, s.idpByPerson, { [pid]: list }), modal: null, form: {} });
+    } else if (s.modal === "alumni_new") {
+      const person = findPerson(f.personName);
+      if (!person) { Store.setState({ modal: null, form: {} }); return; }
+      const endIso = /^\d{4}-\d{2}-\d{2}$/.test(f.end || "") ? f.end : "2026-08-26";
+      const sD = new Date(person.start), eD = new Date(endIso);
+      let mo = (eD.getFullYear() - sD.getFullYear()) * 12 + (eD.getMonth() - sD.getMonth());
+      if (eD.getDate() < sD.getDate()) mo -= 1;
+      const years = Math.floor(mo / 12), rem = mo % 12;
+      const yearsTxt = years + " ปี" + (rem ? " " + rem + " เดือน" : "");
+      const reasonPair = ALUMNI_REASONS.find(r => r[0] === f.reason) || ALUMNI_REASONS[0];
+      const entry = { name: person.name, pos: person.pos, unit: person.unit, start: person.startTh, end: Model.thDate(endIso), years: yearsTxt, reason: reasonPair[0],
+        chip: reasonPair[1] === "ok" ? "background:#f2f5f4;color:#3d4b47" : reasonPair[1] === "move" ? "background:#e6eef7;color:#2a5f8f" : reasonPair[1] === "study" ? "background:#f2e9f7;color:#5d4a9c" : "background:#fdf1e0;color:#8a5310" };
+      setAlumni([entry].concat(getAlumni(s)));
+      Model.invalidate();
+      const users = getUsers(s).slice();
+      let usersChanged = false;
+      for (let i = 0; i < users.length; i++) {
+        if (users[i].personName === person.name && users[i].status === "ใช้งานอยู่") { users[i] = Object.assign({}, users[i], { status: "ระงับการใช้งาน" }); usersChanged = true; }
+      }
+      Store.setState({ deletedIds: (s.deletedIds || []).concat(person.id), users: usersChanged ? users : s.users, modal: null, form: {} });
     } else {
       Store.setState({ modal: null, form: {} });
     }
@@ -640,11 +704,13 @@ const VM = (() => {
 
   function compute(state) {
     const S = state, people = Model.build(state);
-    const activePeople = people.filter(p => !p.deleted);
+    const activePeople = Model.sortPeople(people.filter(p => !p.deleted));
     const currentAccount = getUsers(state).find(u => u.id === S.currentUserId);
-    const linkedPerson = (currentAccount && currentAccount.personName) ? activePeople.find(p => p.name === currentAccount.personName) : null;
-    const me = linkedPerson || ((people[4] && !people[4].deleted) ? people[4] : (activePeople[0] || people[4]));
-    const allowed = { chief: ["dash", "people", "person", "attend", "idp"], staff: ["me"], sec: ["daily", "appr", "roster", "alumni"], admin: ["adm_people", "adm_conf", "adm_target", "adm_user"] }[S.role];
+    const linkedPerson = (currentAccount && currentAccount.personName) ? people.find(p => p.name === currentAccount.personName && !p.deleted) : null;
+    const me = linkedPerson || activePeople[0] || null;
+    const meId = me ? me.id : null;
+
+    const allowed = { chief: ["dash", "people", "person", "attend", "idp"], staff: ["me"], sec: ["daily", "appr", "roster", "alumni", "leave_report"], admin: ["adm_people", "adm_conf", "adm_target", "adm_user"] }[S.role];
     let page = allowed.indexOf(S.page) >= 0 ? S.page : allowed[0];
     const sel_ = people[S.sel];
     if (page === "person" && (!sel_ || sel_.deleted)) page = "people";
@@ -666,11 +732,18 @@ const VM = (() => {
     const acct = currentAccount ? { name: currentAccount.name, ini: Model.ini(currentAccount.name), role: currentAccount.role }
       : { name: myRole[1], ini: myRole[2], role: myRole[1] };
 
+    const tracks = getTracks(state);
+
     const q = S.q.trim();
     const match = p => (!q || (p.name + p.pos + p.sub + p.interests.join()).toLowerCase().indexOf(q.toLowerCase()) >= 0) && (S.track === "ทุก Career Path" || p.track === S.track);
     const rows = activePeople.filter(match);
 
     const watchList = activePeople.filter(p => p.hours < 30).slice(0, 5).map(p => ({ ini: p.ini, name: p.name, unit: p.unit, hours: p.hours, gap: (40 - p.hours) + " ชม.", go: () => go("person", { sel: p.id }) }));
+    const avgHours = activePeople.length ? Math.round(activePeople.reduce((a, p) => a + p.hours, 0) / activePeople.length * 10) / 10 : 0;
+    const avgHoursPct = Math.min(100, Math.round(avgHours / (T(state).hours || 1) * 100));
+    const cpePassCount = activePeople.filter(p => p.cpe >= T(state).cpe).length;
+    const idpDonePct = activePeople.length ? Math.round(activePeople.reduce((a, p) => a + p.idpPct, 0) / activePeople.length) : 0;
+    const pendingApprCount = getAppr(state).filter(a => a.status === "รอบันทึกผล").length;
 
     const monthOrder = [9, 10, 11, 0, 1, 2, 3, 4, 5, 6, 7, 8];
     const monthTabs = monthOrder.map(m => ({ label: TH_M[m] + (m >= 9 ? " 68" : " 69"), on: pill(S.month === m), go: () => Store.setState({ month: m }) }));
@@ -681,20 +754,18 @@ const VM = (() => {
       const late = h % 11 === 0 ? 2 : h % 7 === 0 ? 1 : 0;
       const vac = h % 9 === 0 ? 2 : h % 13 === 0 ? 1 : 0;
       const per = h % 11 === 3 ? 1 : 0, sick = h % 8 === 2 ? 1 : 0;
-      const mat = (i === 5 && S.month >= 3 && S.month <= 5) ? 20 : 0;
-      const study = (i === 25 && S.month <= 7) ? wd : 0;
       const trip = h % 6 === 1 ? 2 : h % 5 === 2 ? 1 : 0;
       const abs = h % 97 === 4 ? 1 : 0;
-      return { name: p.name, unit: p.unit, work: Math.max(0, wd - vac - per - sick - mat - study - abs), late: late || "–", vac: vac || "–", personal: per || "–", sick: sick || "–", mat: mat || "–", study: study || "–", trip: trip || "–", absent: abs || "–",
+      return { name: p.name, unit: p.unit, work: Math.max(0, wd - vac - per - sick - trip - abs), late: late || "–", vac: vac || "–", personal: per || "–", sick: sick || "–", trip: trip || "–", absent: abs || "–",
         lateStyle: late ? "color:#8a5310;font-weight:600" : "color:#c3d2ce", absStyle: abs ? "color:#8f231b;font-weight:600" : "color:#c3d2ce" };
     });
     const sum = k => attendRows.reduce((a, r) => a + (typeof r[k] === "number" ? r[k] : 0), 0);
     const attendCards = [
       { label: "วันทำการเดือนนี้", value: wd + " วัน", note: "ตามปฏิทินราชการ", color: "" },
-      { label: "อัตรามาปฏิบัติงาน", value: (100 - sum("absent") / (wd * 40) * 100).toFixed(1) + "%", note: "รวมทุกราชการ", color: "color:#0e6b5b" },
+      { label: "อัตรามาปฏิบัติงาน", value: activePeople.length ? (100 - sum("absent") / (wd * activePeople.length) * 100).toFixed(1) + "%" : "-", note: "รวมทุกราชการ", color: "color:#0e6b5b" },
       { label: "มาสาย", value: sum("late") + " ครั้ง", note: "จาก " + attendRows.filter(r => r.late !== "–").length + " คน", color: "color:#8a5310" },
-      { label: "ลาทุกประเภท", value: (sum("vac") + sum("personal") + sum("sick") + sum("mat") + sum("study")) + " วัน", note: "พักผ่อน/กิจ/ป่วย/คลอด/ศึกษา", color: "color:#2a5f8f" },
-      { label: "ไปราชการ", value: sum("trip") + " วัน", note: "ประชุม/อบรมนอกสถานที่", color: "color:#2a5f8f" },
+      { label: "ลาทุกประเภท", value: (sum("vac") + sum("personal") + sum("sick")) + " วัน", note: "พักผ่อน/กิจ/ป่วย", color: "color:#2a5f8f" },
+      { label: "ไปประชุมนอกสถานที่", value: sum("trip") + " วัน", note: "ประชุม/อบรมนอกสถานที่", color: "color:#2a5f8f" },
       { label: "ขาดงาน", value: sum("absent") + " วัน", note: "ต้องชี้แจงเป็นลายลักษณ์อักษร", color: "color:#8f231b" }
     ];
 
@@ -702,31 +773,37 @@ const VM = (() => {
     const idpCards = activePeople.filter(p => {
       if (S.idpFilter === "ทั้งหมด") return true;
       if (S.idpFilter === "ครบถ้วนแล้ว") return p.idpPct >= 90;
-      if (S.idpFilter === "ต้องติดตาม") return p.idpPct < 45;
-      return p.idpPct >= 45 && p.idpPct < 90;
+      if (S.idpFilter === "ต้องติดตาม") return p.idpTotal > 0 && p.idpPct < 45;
+      return p.idpTotal > 0 && p.idpPct >= 45 && p.idpPct < 90;
     }).slice(0, 12).map(p => ({
-      ini: p.ini, name: p.name, pos: p.pos, unit: p.unit, avaBg: p.avaBg, goal: p.idp[0].goal, comp: p.idp.length + " ด้าน", acts: p.idpTotal + " รายการ", mentor: p.mentor, pct: p.idpPct,
+      id: p.id, ini: p.ini, name: p.name, pos: p.pos, unit: p.unit, avaBg: p.avaBg,
+      goal: p.idp.length ? p.idp[0].goal : "ยังไม่มีเป้าหมาย IDP", comp: p.idp.length + " ด้าน", acts: p.idpTotal + " รายการ", mentor: p.mentor, pct: p.idpPct,
       bar: "background:" + (p.idpPct >= 90 ? "#0e6b5b" : p.idpPct >= 45 ? "#2a5f8f" : "#a9640f"),
-      status: p.idpPct >= 90 ? "ครบถ้วนแล้ว" : p.idpPct >= 45 ? "กำลังดำเนินการ" : "ต้องติดตาม",
-      chip: p.idpPct >= 90 ? "background:#e3f1ee;color:#0a4f43" : p.idpPct >= 45 ? "background:#e6eef7;color:#2a5f8f" : "background:#fdf1e0;color:#8a5310",
-      go: () => go("person", { sel: p.id })
+      status: p.idpTotal === 0 ? "ยังไม่มีแผน" : p.idpPct >= 90 ? "ครบถ้วนแล้ว" : p.idpPct >= 45 ? "กำลังดำเนินการ" : "ต้องติดตาม",
+      chip: p.idpTotal === 0 ? "background:#f2f5f4;color:#8a968f" : p.idpPct >= 90 ? "background:#e3f1ee;color:#0a4f43" : p.idpPct >= 45 ? "background:#e6eef7;color:#2a5f8f" : "background:#fdf1e0;color:#8a5310",
+      go: () => go("person", { sel: p.id }),
+      edit: () => openModal("idp_edit:" + p.id + ":0", p.idp[0] ? { goal: p.idp[0].goal, action: p.idp[0].action, period: p.idp[0].period, pct: String(p.idp[0].pct) } : {})
     }));
 
     const meTabs = [["overview", "ภาพรวม & Career Path"], ["train", "ประชุม / อบรม"], ["work", "วิทยากร & งานวิจัย"], ["interest", "ความสนใจ & การพัฒนา"], ["leave", "วันลาคงเหลือ"]].map(t => ({
       label: t[1], on: S.tab === t[0] ? "color:#0e6b5b;border-bottom-color:#0e6b5b;font-weight:600" : "color:#5c6b67",
       go: () => Store.setState({ tab: t[0] })
     }));
-    const myCourses = S.extraCourses.concat(me.courses.map(c => Object.assign({ status: "รับรองแล้ว", chip: "background:#e3f1ee;color:#0a4f43" }, c)));
-    const myTalks = S.extraTalks.concat(me.talks);
-    const myResearch = S.extraRes.concat(me.research);
 
-    const tg = tagState(state);
+    const myCourses = me ? (S.coursesByPerson[me.id] || []).map((c, idx) => Object.assign({ idx }, c)) : [];
+    const myTalks = me ? (S.talksByPerson[me.id] || []).map((t, idx) => Object.assign({ idx }, t)) : [];
+    const myResearch = me ? (S.researchByPerson[me.id] || []).map((r, idx) => Object.assign({ idx }, r)) : [];
+    const removeCourse = idx => { if (!me) return; const l = (S.coursesByPerson[me.id] || []).filter((_, j) => j !== idx); Model.invalidate(); Store.setState({ coursesByPerson: Object.assign({}, S.coursesByPerson, { [me.id]: l }) }); };
+    const removeTalk = idx => { if (!me) return; const l = (S.talksByPerson[me.id] || []).filter((_, j) => j !== idx); Model.invalidate(); Store.setState({ talksByPerson: Object.assign({}, S.talksByPerson, { [me.id]: l }) }); };
+    const removeResearch = idx => { if (!me) return; const l = (S.researchByPerson[me.id] || []).filter((_, j) => j !== idx); Model.invalidate(); Store.setState({ researchByPerson: Object.assign({}, S.researchByPerson, { [me.id]: l }) }); };
+
+    const tg = me ? tagState(state, me.id) : { int: [], str: [], dev: [], d0: "", d1: "", d2: "" };
     const mkGroup = (key, dk, title, ph, style) => ({
       title, placeholder: ph, draft: tg[dk],
-      tags: tg[key].map((t, idx) => ({ label: t, style, remove: () => setTags(state, { [key]: tg[key].filter((_, j) => j !== idx) }) })),
-      setDraft: e => setTags(state, { [dk]: e.target.value }),
-      add: () => { if (tg[dk].trim()) setTags(state, { [key]: tg[key].concat(tg[dk].trim()), [dk]: "" }); },
-      key: e => { if (e.key === "Enter" && tg[dk].trim()) setTags(state, { [key]: tg[key].concat(tg[dk].trim()), [dk]: "" }); }
+      tags: tg[key].map((t, idx) => ({ label: t, style, remove: () => me && setTags(state, me.id, { [key]: tg[key].filter((_, j) => j !== idx) }) })),
+      setDraft: e => me && setTags(state, me.id, { [dk]: e.target.value }),
+      add: () => { if (me && tg[dk].trim()) setTags(state, me.id, { [key]: tg[key].concat(tg[dk].trim()), [dk]: "" }); },
+      key: e => { if (me && e.key === "Enter" && tg[dk].trim()) setTags(state, me.id, { [key]: tg[key].concat(tg[dk].trim()), [dk]: "" }); }
     });
     const tagGroups = [
       mkGroup("int", "d0", "ความสนใจ", "เช่น Antimicrobial Stewardship", "background:#e3f1ee;color:#0a4f43"),
@@ -743,71 +820,95 @@ const VM = (() => {
         file: st && st.file ? st.file : "ยังไม่ได้แนบไฟล์",
         reqStatus: st && st.file ? "ส่งให้หัวหน้ากลุ่มงานพิจารณาแล้ว" : "รอแนบไฟล์เอกสารประกอบการประชุม",
         toggle: () => Store.setState({ conf: Object.assign({}, S.conf, { [i]: st ? null : { file: "" } }) }),
-        upload: () => Store.setState({ conf: Object.assign({}, S.conf, { [i]: { file: "แนบเอกสารการประชุม_" + (i + 1) + ".pdf (1.2 MB)" } }) })
+        upload: async e => {
+          const fl = e.target.files && e.target.files[0];
+          if (!fl) return;
+          let label = "แนบแล้ว: " + fl.name;
+          if (typeof RemoteSync !== "undefined" && RemoteSync.uploadFile) {
+            const url = await RemoteSync.uploadFile(fl);
+            if (url) label = url;
+          }
+          Store.setState({ conf: Object.assign({}, S.conf, { [i]: { file: label } }) });
+        }
       };
     });
 
-    const myLeaveLog = [
-      ["12 ส.ค. 2569", "มาสาย", "เข้างาน 08:42 (เข้า 08:30)", "บันทึกแล้ว", "background:#fdf1e0;color:#8a5310"],
-      ["5–6 ส.ค. 2569", "ไปราชการ", "ประชุม Anticoagulant Forum", "อนุมัติแล้ว", "background:#e6eef7;color:#2a5f8f"],
-      ["21 ก.ค. 2569", "ลาพักผ่อน", "ลาต่อเนื่อง 1 วัน", "อนุมัติแล้ว", "background:#e3f1ee;color:#0a4f43"],
-      ["3 ก.ค. 2569", "ลาป่วย", "ไข้หวัด (มีใบรับรองแพทย์)", "อนุมัติแล้ว", "background:#f2e9f7;color:#5d4a9c"],
-      ["18 มิ.ย. 2569", "ลากิจส่วนตัว", "ธุระครอบครัว", "อนุมัติแล้ว", "background:#e6eef7;color:#2a5f8f"],
-      ["9 มิ.ย. 2569", "มาสาย", "เข้างาน 08:37", "บันทึกแล้ว", "background:#fdf1e0;color:#8a5310"],
-      ["2 เม.ย. 2569", "ลาพักผ่อน", "ลาต่อเนื่อง 2 วัน", "อนุมัติแล้ว", "background:#e3f1ee;color:#0a4f43"]
-    ].map(l => ({ date: l[0], type: l[1], note: l[2], status: l[3], chip: l[4] }));
+    const myLeaveLog = []; // real leave/late history now lives in the daily log itself.
 
-    const dOpts = [["work", "มาปฏิบัติงาน", "#0e6b5b"], ["late", "มาสาย", "#c9821c"], ["leave", "ลา", "#2a5f8f"], ["trip", "ไปราชการ", "#5d4a9c"]];
+    const dOpts = [["work", "มาปฏิบัติงาน", "#0e6b5b"], ["late", "มาสาย", "#c9821c"], ["vacation", "ลาพักผ่อน", "#0f7a86"], ["sick", "ลาป่วย", "#5d4a9c"], ["personal", "ลากิจ", "#2a5f8f"], ["trip", "ไปประชุมนอกสถานที่", "#1d6fa5"]];
+    const dailyForDate = S.daily[S.dailyDate] || {};
     const dailyRows = activePeople.map(p => {
       const i = p.id;
-      const h = Model.hash(i, 61);
-      const def = h % 23 === 1 ? "late" : h % 17 === 3 ? "leave" : h % 11 === 5 ? "trip" : "work";
-      const cur = S.daily[i] || def;
-      const time = cur === "work" ? "0" + (7 + h % 2) + ":" + (10 + h % 45) : cur === "late" ? "08:" + (32 + h % 25) : "–";
-      return { name: p.name, pos: p.pos, unit: p.unit, time, timeStyle: cur === "late" ? "color:#8a5310;font-weight:600" : "color:#3d4b47",
-        note: cur === "leave" ? "ลาพักผ่อน (อนุมัติแล้ว)" : cur === "trip" ? "ประชุมนอกสถานที่" : cur === "late" ? "แจ้งเหตุรถติด" : "—",
-        opts: dOpts.map(o => ({ label: o[1], on: cur === o[0] ? "border:1px solid " + o[2] + ";background:" + o[2] + ";color:#fff" : "border:1px solid #dde5e2;background:#fff;color:#5c6b67", set: () => Store.setState({ daily: Object.assign({}, S.daily, { [i]: o[0] }), dailySaved: false }) })) };
+      const cur = dailyForDate[i] || "work";
+      return { name: p.name, pos: p.pos, unit: p.unit,
+        opts: dOpts.map(o => ({ label: o[1], on: cur === o[0] ? "border:1px solid " + o[2] + ";background:" + o[2] + ";color:#fff" : "border:1px solid #dde5e2;background:#fff;color:#5c6b67",
+          set: () => Store.setState({ daily: Object.assign({}, S.daily, { [S.dailyDate]: Object.assign({}, dailyForDate, { [i]: o[0] }) }), dailySavedDates: Object.assign({}, S.dailySavedDates, { [S.dailyDate]: false }) }) })) };
     });
-    const cnt = label => dailyRows.filter(r => r.opts.find(o => o.on.indexOf("background:#fff") < 0).label === label).length;
+    const cnt = label => Object.keys(dailyForDate).filter(pid => dOpts.find(o => o[0] === dailyForDate[pid] && o[1] === label)).length;
     const dailySummary = [
-      { label: "มาปฏิบัติงาน", value: cnt("มาปฏิบัติงาน"), bg: "background:#e3f1ee;color:#0a4f43" },
+      { label: "มาปฏิบัติงาน", value: activePeople.filter(p => (dailyForDate[p.id] || "work") === "work").length, bg: "background:#e3f1ee;color:#0a4f43" },
       { label: "มาสาย", value: cnt("มาสาย"), bg: "background:#fdf1e0;color:#8a5310" },
-      { label: "ลา", value: cnt("ลา"), bg: "background:#e6eef7;color:#2a5f8f" },
-      { label: "ไปราชการ", value: cnt("ไปราชการ"), bg: "background:#f2e9f7;color:#5d4a9c" }
+      { label: "ลา", value: cnt("ลาพักผ่อน") + cnt("ลาป่วย") + cnt("ลากิจ"), bg: "background:#e6eef7;color:#2a5f8f" },
+      { label: "ไปประชุมนอกสถานที่", value: cnt("ไปประชุมนอกสถานที่"), bg: "background:#f2e9f7;color:#5d4a9c" }
     ];
 
-    const apprRows = APPR_SEED.map((a, i) => {
-      const ov = S.appr[i], st = ov ? ov.status : a[5], p = people[a[0]];
-      return { name: p.name, unit: p.unit, title: a[1], date: a[2], budget: a[3], doc: ov ? ov.doc : a[4], status: st,
-        chip: st === "อนุมัติ" ? "background:#e3f1ee;color:#0a4f43" : st === "ไม่อนุมัติ" ? "background:#fbe9e7;color:#8f231b" : "background:#fdf1e0;color:#8a5310",
-        record: () => openModal("appr:" + i, { result: st === "รอบันทึกผล" ? "อนุมัติ" : st, doc: ov ? ov.doc : (a[4] === "–" ? "" : a[4]) }) };
+    const apprRows = getAppr(state).map((a, i) => {
+      const p = people[a.personId] || { name: "-", unit: "-" };
+      return { name: p.name, unit: p.unit, title: a.title, date: a.date, budget: a.budget, doc: a.doc || "-", status: a.status,
+        chip: a.status === "อนุมัติ" ? "background:#e3f1ee;color:#0a4f43" : a.status === "ไม่อนุมัติ" ? "background:#fbe9e7;color:#8f231b" : "background:#fdf1e0;color:#8a5310",
+        record: () => openModal("appr_edit:" + i, { result: a.status === "รอบันทึกผล" ? "อนุมัติ" : a.status, doc: a.doc || "", file: a.file || "" }),
+        remove: () => { if (!confirm("ยืนยันการลบรายการนี้?")) return; setAppr(getAppr(state).filter((_, j) => j !== i)); }
+      };
     });
     const apprStats = { total: apprRows.length, ok: apprRows.filter(a => a.status === "อนุมัติ").length, no: apprRows.filter(a => a.status === "ไม่อนุมัติ").length, wait: apprRows.filter(a => a.status === "รอบันทึกผล").length };
 
-    const rosterRows = activePeople.filter(match).map((p, i) => ({ no: i + 1, name: p.name, pos: p.pos, unit: p.unit, emp: p.emp, startTh: p.startTh, tenure: p.tenure,
+    const rosterRows = Model.sortPeople(activePeople.filter(match)).map((p, i) => ({ no: i + 1, name: p.name, pos: p.pos, unit: p.unit, emp: p.emp, startTh: p.startTh, tenure: p.tenure,
       empChip: p.emp === "ข้าราชการ" ? "background:#e3f1ee;color:#0a4f43" : "background:#e6eef7;color:#2a5f8f" }));
-    const alumniRows = ALUMNI.map(a => ({ name: a[0], pos: a[1], unit: a[2], start: a[3], end: a[4], years: a[5], reason: a[6],
-      chip: a[7] === "ok" ? "background:#f2f5f4;color:#3d4b47" : a[7] === "move" ? "background:#e6eef7;color:#2a5f8f" : a[7] === "study" ? "background:#f2e9f7;color:#5d4a9c" : "background:#fdf1e0;color:#8a5310" }));
+    const alumniRows = getAlumni(state).map(a => ({ name: a.name, pos: a.pos, unit: a.unit, start: a.start, end: a.end, years: a.years, reason: a.reason, chip: a.chip }));
+
+    // Monthly leave report: aggregate every recorded day in state.daily that falls in S.reportMonth.
+    const reportMonth = S.reportMonth || "2026-08";
+    const reportRows = activePeople.map(p => {
+      const counts = { vacation: 0, sick: 0, personal: 0, late: 0, trip: 0 };
+      Object.keys(S.daily).forEach(dateKey => {
+        if (dateKey.slice(0, 7) !== reportMonth) return;
+        const st = (S.daily[dateKey] || {})[p.id];
+        if (counts[st] !== undefined) counts[st]++;
+      });
+      return { name: p.name, unit: p.unit, vacation: counts.vacation, sick: counts.sick, personal: counts.personal, late: counts.late, trip: counts.trip,
+        total: counts.vacation + counts.sick + counts.personal };
+    });
 
     const mk = S.modal || "";
-    const mCfg = mk === "train" ? { title: "รายงานการประชุม / อบรม", sub: "ข้อมูลจะเก็บเข้าแฟ้มพัฒนาบุคลากรและนับ CPE", cta: "บันทึกรายการ",
-        fields: [fld(state, "วันที่เข้าร่วม", "date", "เช่น 12 ส.ค. 69"), fld(state, "ชื่อหลักสูตร / การประชุม", "title", ""), fld(state, "หน่วยงานผู้จัด", "org", ""), sel(state, "ประเภท", "type", ["อบรม", "ประชุมวิชาการ", "ประชุมภายใน", "สัมมนา/ศึกษาดูงาน"]), fld(state, "จำนวนชั่วโมง", "hours", "เช่น 12"), file(state, "แนบเกียรติบัตร / หนังสือรับรอง", "cert")] }
-      : mk === "talk" ? { title: "เพิ่มประวัติเป็นวิทยากร", sub: "ผลงานนี้จะแสดงในโปรไฟล์และนับ KPI การเรียนรู้", cta: "บันทึกผลงาน",
-        fields: [fld(state, "หัวข้อที่บรรยาย", "topic", ""), fld(state, "เวที / หน่วยงานผู้เชิญ", "venue", ""), fld(state, "เดือน/ปี", "date", "เช่น ส.ค. 69"), fld(state, "จำนวนผู้ฟัง (คน)", "aud", "เช่น 40"), file(state, "แนบหนังสือเชิญ / ภาพกิจกรรม", "doc")] }
+    const contextPersonId = S.__contextPersonId; // set by openTrain/openTalk/openRes callers below
+    const mCfg = mk === "train" ? { title: "รายงานการประชุม / อบรม", sub: "ข้อมูลจะเก็บเข้าแฟ้มพัฒนาบุคลากร", cta: "บันทึกรายการ",
+        fields: [].concat(dateRange(state, "วันที่เข้าร่วม", "dateStart", "dateEnd"), [fld(state, "ชื่อหลักสูตร / การประชุม", "title", ""), fld(state, "หน่วยงานผู้จัด", "org", ""), sel(state, "ประเภท", "type", ["อบรม", "ประชุมวิชาการ", "ประชุมภายใน", "สัมมนา/ศึกษาดูงาน"])]) }
+      : mk === "talk" ? { title: "เพิ่มประวัติเป็นวิทยากร", sub: "ผลงานนี้จะแสดงในโปรไฟล์", cta: "บันทึกผลงาน",
+        fields: [].concat(dateRange(state, "วันที่บรรยาย", "dateStart", "dateEnd"), [fld(state, "หัวข้อที่บรรยาย", "topic", ""), fld(state, "เวที / หน่วยงานผู้เชิญ", "venue", ""), file(state, "แนบหนังสือเชิญ / ภาพกิจกรรม", "doc")]) }
       : mk === "res" ? { title: "เพิ่มงานวิจัย / R2R", sub: "ระบุผลงานวิจัยที่ดำเนินการหรือกำลังดำเนินการ", cta: "บันทึกผลงาน",
         fields: [fld(state, "ชื่อเรื่อง", "title", ""), sel(state, "บทบาท", "role", ["ผู้วิจัยหลัก", "ผู้ร่วมวิจัย", "ที่ปรึกษา"]), sel(state, "สถานะ", "status", ["กำลังดำเนินการ", "ส่งตีพิมพ์", "ตีพิมพ์แล้ว"]), file(state, "แนบไฟล์เอกสาร", "doc")] }
-      : mk === "person" ? { title: "เพิ่มบุคลากรใหม่", sub: "ข้อมูลจะปรากฏทั้งทะเบียนรายชื่อ Dashboard และแผน IDP", cta: "เพิ่มบุคลากร",
-        fields: [fld(state, "ชื่อ – สกุล (พร้อมคำนำหน้า)", "name", "เช่น ภญ.กานต์ติมา ศรีสุข"), sel(state, "ตำแหน่ง / ระดับ", "pos", ["เภสัชกรปฏิบัติการ", "เภสัชกรชำนาญการ", "เภสัชกรชำนาญการพิเศษ", "เภสัชกรเชี่ยวชาญ", "เจ้าพนักงานเภสัชกรรมปฏิบัติงาน", "เจ้าพนักงานเภสัชกรรมชำนาญงาน", "เจ้าพนักงานเภสัชกรรมอาวุโส"]), sel(state, "Target Career Path", "track", TRACKS.map(t => t[0])), fld(state, "สาขาย่อย / หน่วยงานที่ปฏิบัติ", "sub", "เช่น Outpatient Services"), fld(state, "วันเริ่มปฏิบัติงาน (ปี ค.ศ. เช่น 2026-09-01)", "start", "2026-09-01"), sel(state, "ประเภทการจ้าง", "emp", ["ข้าราชการ", "พนักงานราชการ", "ลูกจ้างชั่วคราว"])] }
-      : mk === "conf" || mk.indexOf("conf:") === 0 ? { title: mk === "conf" ? "เพิ่มงานประชุม / คอร์สอบรม" : "แก้ไขข้อมูลงานประชุม", sub: "เมื่อเผยแพร่ บุคลากรจะเห็นและกดแสดงความสนใจได้", cta: "บันทึกและเผยแพร่",
-        fields: [fld(state, "ชื่องานประชุม / หลักสูตร", "title", ""), fld(state, "หน่วยงานผู้จัด", "org", ""), fld(state, "วันที่จัด", "date", "เช่น 14–16 ต.ค. 2569"), fld(state, "สถานที่", "place", ""), fld(state, "ค่าลงทะเบียน", "fee", "เช่น 4,500 บาท"), fld(state, "หน่วย CPE", "cpe", "เช่น 18"), fld(state, "จำนวนที่นั่งที่กลุ่มงานสนับสนุน", "seats", "เช่น 3"), sel(state, "แหล่งงบประมาณ", "budget", ["งบพัฒนาบุคลากร", "งบกลุ่มงาน", "ผู้เข้าร่วมออกค่าใช้จ่ายเอง", "ไม่มีค่าใช้จ่าย"]), sel(state, "สถานะการเผยแพร่", "pub", ["เผยแพร่ทันที", "บันทึกเป็นฉบับร่าง"])] }
+      : mk === "person" ? { title: "เพิ่มบุคลากรใหม่", sub: "ข้อมูลจะปรากฏทั้งทะเบียนรายชื่อและ Dashboard", cta: "เพิ่มบุคลากร",
+        fields: [fld(state, "ชื่อ – สกุล (พร้อมคำนำหน้า)", "name", "เช่น ภญ.กานต์ติมา ศรีสุข"), sel(state, "ตำแหน่ง / ระดับ", "pos", POSITION_OPTIONS), sel(state, "Target Career Path", "track", tracks.map(t => t[0])), fld(state, "สาขาย่อย / หน่วยงานที่ปฏิบัติ", "sub", "เช่น Outpatient Services"), dateFld(state, "วันเริ่มปฏิบัติงาน", "start"), sel(state, "ประเภทการจ้าง", "emp", EMP_OPTIONS)] }
+      : mk === "conf" || mk.indexOf("conf:") === 0 ? { title: mk === "conf" ? "เพิ่มงานประชุม / คอร์สอบรม" : "แก้ไขข้อมูลงานประชุม", sub: "บันทึกแล้วเผยแพร่ให้บุคลากรเห็นทันที", cta: "บันทึกและเผยแพร่",
+        fields: [fld(state, "ชื่องานประชุม / หลักสูตร", "title", ""), fld(state, "หน่วยงานผู้จัด", "org", ""), fld(state, "วันที่จัด", "date", "เช่น 14–16 ต.ค. 2569"), fld(state, "สถานที่", "place", ""), fld(state, "ค่าลงทะเบียน", "fee", "เช่น 4,500 บาท"), fld(state, "หน่วย CPE", "cpe", "เช่น 18"), fld(state, "จำนวนที่นั่งที่กลุ่มงานสนับสนุน", "seats", "เช่น 3"), sel(state, "แหล่งงบประมาณ", "budget", CONF_BUDGET_OPTIONS)] }
       : mk === "user" || mk.indexOf("user:") === 0 ? { title: mk === "user" ? "เพิ่มบัญชีผู้ใช้งาน" : "แก้ไขสิทธิ์ผู้ใช้งาน", sub: "กำหนด Username, Password และบทบาทที่ควบคุมหน้าที่ผู้ใช้เข้าถึงได้", cta: "บันทึกสิทธิ์",
         fields: [fld(state, "Username (เลขประจำตัว)", "id", "เช่น 2140009"), fld(state, "ชื่อ – สกุล", "name", ""), fld(state, "Password", "password", "เช่น LS123456"), sel(state, "บทบาท", "role", ["หัวหน้ากลุ่มงาน", "บุคลากร", "เลขากลุ่มงาน", "ผู้ดูแลระบบ (Admin)"]), sel(state, "สถานะบัญชี", "status", ["ใช้งานอยู่", "ระงับการใช้งาน"])].concat(
           (state.form.role || "หัวหน้ากลุ่มงาน") === "บุคลากร"
-            ? [sel(state, "ผูกกับข้อมูลบุคลากร (แสดงผลในหน้าโปรไฟล์ของฉัน)", "personName", [UNLINKED_PERSON].concat(activePeople.map(p => p.name)))]
+            ? [personSel(state, "ผูกกับข้อมูลบุคลากร (แสดงผลในหน้าโปรไฟล์ของฉัน)", "personName", activePeople, UNLINKED_PERSON)]
             : []
         ) }
-      : mk.indexOf("appr:") === 0 ? { title: "บันทึกผลการอนุมัติ", sub: "ตามหนังสือตอบกลับจากผู้มีอำนาจอนุมัติ", cta: "บันทึกผล",
-        fields: [sel(state, "ผลอนุมัติ", "result", ["อนุมัติ", "ไม่อนุมัติ", "รอบันทึกผล"]), fld(state, "เลขที่หนังสือ", "doc", "เช่น ลส 0432/1215"), fld(state, "วันที่ลงนาม", "signed", "เช่น 20 ส.ค. 69"), fld(state, "หมายเหตุ", "note", "เช่น อนุมัติโดยมีเงื่อนไขพัฒนาบุคลากร")] }
+      : mk === "track" || mk.indexOf("track:") === 0 ? { title: mk === "track" ? "เพิ่มสาย Career Path" : "แก้ไขชื่อ Career Path", sub: "ใช้เลือกได้ในโปรไฟล์และแผน IDP ของทุกคน", cta: "บันทึก",
+        fields: [fld(state, "ชื่อสาย (Career Path)", "name", "เช่น Pharmaceutical Informatics"), fld(state, "คำอธิบาย / หน่วยงาน", "unit", "เช่น งานสารสนเทศเภสัชกรรม")] }
+      : mk === "appr_new" ? { title: "เพิ่มคำขอไปประชุม / อบรม", sub: "บันทึกคำขอ แล้วมาบันทึกผลอนุมัติภายหลังได้", cta: "บันทึกคำขอ",
+        fields: [personSel(state, "บุคลากร", "personName", activePeople), fld(state, "ชื่องานประชุม / อบรม", "title", ""), fld(state, "วันที่จัด", "date", "เช่น 14–16 ต.ค. 69"), fld(state, "งบประมาณ", "budget", "เช่น 4,500")] }
+      : mk.indexOf("appr_edit:") === 0 ? { title: "บันทึกผลการอนุมัติ", sub: "ตามหนังสือตอบกลับจากผู้มีอำนาจอนุมัติ", cta: "บันทึกผล",
+        fields: [sel(state, "ผลอนุมัติ", "result", ["อนุมัติ", "ไม่อนุมัติ", "รอบันทึกผล"]), fld(state, "เลขที่หนังสือ", "doc", "เช่น ลส 0432/1215"), file(state, "แนบไฟล์เอกสารอนุมัติ", "file")] }
+      : mk === "idp_new" ? { title: "สร้างแผน IDP รอบใหม่", sub: "กำหนดเป้าหมายและแผนปฏิบัติสำหรับบุคลากรที่เลือก", cta: "บันทึกแผน",
+        fields: [personSel(state, "บุคลากร", "personName", activePeople, sel_ ? sel_.name : null), fld(state, "เป้าหมายหลัก", "goal", ""), fld(state, "แผนปฏิบัติ", "action", ""), fld(state, "ช่วงเวลา", "period", "เช่น ไตรมาส 1–2/69"), fld(state, "ความก้าวหน้า (%)", "pct", "0-100")] }
+      : mk.indexOf("idp_edit:") === 0 ? { title: "ทบทวนแผน IDP", sub: "ปรับปรุงความก้าวหน้าและรายละเอียดของเป้าหมายนี้", cta: "บันทึกการทบทวน",
+        fields: [fld(state, "เป้าหมายหลัก", "goal", ""), fld(state, "แผนปฏิบัติ", "action", ""), fld(state, "ช่วงเวลา", "period", ""), fld(state, "ความก้าวหน้า (%)", "pct", "0-100")] }
+      : mk === "alumni_new" ? { title: "บันทึกผู้ลาออก / โอนย้าย / เกษียณ", sub: "บันทึกแล้วจะย้ายบุคคลนี้ออกจากทะเบียนปัจจุบัน และระงับบัญชีผู้ใช้ (ถ้ามี) ให้อัตโนมัติ", cta: "บันทึก",
+        fields: [personSel(state, "บุคลากร", "personName", activePeople), dateFld(state, "วันที่สิ้นสุดปฏิบัติงาน", "end"), sel(state, "เหตุผล", "reason", ALUMNI_REASONS.map(r => r[0]))] }
       : { title: "", sub: "", cta: "บันทึก", fields: [] };
 
     const lr = LOGIN_ROLES.find(r => r[0] === S.loginRole) || LOGIN_ROLES[0];
@@ -850,11 +951,10 @@ const VM = (() => {
 
     const TG = T(state);
     const aq = S.admQ.trim().toLowerCase();
-    const admPeople = activePeople.filter(p => !aq || (p.name + p.pos + p.sub).toLowerCase().indexOf(aq) >= 0).map((p, i) => ({
+    const admPeople = Model.sortPeople(activePeople.filter(p => !aq || (p.name + p.pos + p.sub).toLowerCase().indexOf(aq) >= 0)).map((p, i) => ({
       no: i + 1, name: p.name, pos: p.pos, unit: p.unit, sub: p.sub, track: p.trackShort, startTh: p.startTh, tenure: p.tenure, ini: p.ini, avaBg: p.avaBg,
-      newChip: p.id >= RAW.length ? "background:#e3f1ee;color:#0a4f43" : "background:#f2f5f4;color:#5c6b67",
-      newLabel: p.id >= RAW.length ? "เพิ่มใหม่" : "ปฏิบัติงาน",
-      edit: () => openModal("person", { name: p.name, pos: p.pos, track: p.track, sub: p.sub, start: p.start }),
+      newChip: "background:#f2f5f4;color:#5c6b67", newLabel: "ปฏิบัติงาน",
+      edit: () => openModal("person", { name: p.name, pos: p.pos, track: p.track, sub: p.sub, start: p.start, emp: p.emp }),
       remove: () => {
         if (!confirm("ยืนยันการลบข้อมูลของ " + p.name + " ออกจากระบบ? การลบจะซ่อนบุคคลนี้จากทุกหน้าจอ")) return;
         Model.invalidate();
@@ -868,7 +968,7 @@ const VM = (() => {
       toggle: () => { const l = getConfs(state).slice(); l[i] = Object.assign({}, l[i], { pub: !l[i].pub }); setConfs(l); },
       toggleLabel: c.pub ? "ยกเลิกเผยแพร่" : "เผยแพร่",
       remove: () => setConfs(getConfs(state).filter((_, j) => j !== i)),
-      edit: () => openModal("conf:" + i, { title: c.title, org: c.org, date: c.date, place: c.place, fee: c.fee, cpe: String(c.cpe), seats: String(c.seats), budget: c.budget, pub: c.pub ? "เผยแพร่ทันที" : "บันทึกเป็นฉบับร่าง" })
+      edit: () => openModal("conf:" + i, { title: c.title, org: c.org, date: c.date, place: c.place, fee: c.fee, cpe: String(c.cpe), seats: String(c.seats), budget: c.budget })
     }));
     const targetFields = [
       ["hours", "ชั่วโมงพัฒนาตนเอง / คน / ปี", "ชม.", "ใช้คำนวณ Dashboard, KPI และรายงาน 'ต้องติดตาม'"],
@@ -876,17 +976,18 @@ const VM = (() => {
       ["talks", "จำนวนครั้งเป็นวิทยากร / ปี", "เรื่อง", "นับรวมเวทีภายในและภายนอกโรงพยาบาล"],
       ["res", "ผลงานวิจัย / R2R / ปี", "เรื่อง", "นับผลงานที่ดำเนินการหรือตีพิมพ์"],
       ["idp", "เกณฑ์ค่าความก้าวหน้า IDP", "%", "ใช้ตัดสินสถานะ 'ครบถ้วนแล้ว' ของแผน IDP"],
-      ["late", "แนวทางมาสาย / ครั้ง / ปี", "ครั้ง", "แสดงจำนวนวันลาคงเหลือของบุคลากร"],
+      ["late", "แนวทางมาสาย", "ครั้ง / รอบการประเมิน", "แสดงจำนวนวันลาคงเหลือของบุคลากร"],
       ["vacJr", "สิทธิลาพักผ่อน (อายุงาน < 10 ปี)", "วัน", "ตามระเบียบการลาของข้าราชการ"],
       ["vacSr", "สิทธิลาพักผ่อน (อายุงาน ≥ 10 ปี)", "วัน", "รวมวันลาสะสมตามระเบียบ"]
     ].map(t => ({ key: t[0], label: t[1], unit: t[2], note: t[3], value: TG[t[0]], set: e => setTarget(state, t[0], e.target.value) }));
-    const trackRows = TRACKS.map(t => ({ name: t[0], unit: t[1], dot: "background:" + t[2], count: activePeople.filter(p => p.track === t[0]).length + " คน" }));
+    const trackRows = tracks.map((t, i) => ({ name: t[0], unit: t[1], dot: "background:" + t[2], count: activePeople.filter(p => p.track === t[0]).length + " คน",
+      edit: () => openModal("track:" + i, { name: t[0], unit: t[1], color: t[2] }) }));
     const admUsers = getUsers(state).map((u, i) => ({
       id: u.id, name: u.name, role: u.role, last: u.last, status: u.status,
       roleChip: u.role.indexOf("Admin") >= 0 ? "background:#0c2a25;color:#fff" : u.role === "หัวหน้ากลุ่มงาน" ? "background:#e3f1ee;color:#0a4f43" : u.role === "เลขากลุ่มงาน" ? "background:#e6eef7;color:#2a5f8f" : "background:#f2f5f4;color:#3d4b47",
       statusChip: u.status === "ใช้งานอยู่" ? "background:#e3f1ee;color:#0a4f43" : "background:#fbe9e7;color:#8f231b",
-      edit: () => openModal("user:" + i, { id: u.id, name: u.name, password: u.password, role: u.role, status: u.status, personName: u.personName || UNLINKED_PERSON }),
       linkedTo: u.personName || "",
+      edit: () => openModal("user:" + i, { id: u.id, name: u.name, password: u.password, role: u.role, status: u.status, personName: u.personName || UNLINKED_PERSON }),
       toggle: () => { const l = getUsers(state).slice(); l[i] = Object.assign({}, l[i], { status: l[i].status === "ใช้งานอยู่" ? "ระงับการใช้งาน" : "ใช้งานอยู่" }); Store.setState({ users: l, admSaved: "" }); },
       toggleLabel: u.status === "ใช้งานอยู่" ? "ระงับ" : "คืนสิทธิ์",
       remove: () => {
@@ -903,6 +1004,7 @@ const VM = (() => {
       admPeople, admCount: admPeople.length, admTotal: activePeople.length,
       admConfRows, admConfPub: getConfs(state).filter(c => c.pub).length, admConfTotal: getConfs(state).length,
       targetFields, trackRows, admUsers, admUserCount: admUsers.length,
+      openAddTrack: () => openModal("track"),
       admSaved: S.admSaved, admSavedOn: !!S.admSaved, clearAdmSaved: () => Store.setState({ admSaved: "" }),
       openAddPerson: () => openModal("person"), openAddConf: () => openModal("conf"), openAddUser: () => openModal("user"),
       resetTargets: () => { Model.invalidate(); Store.setState({ targets: null, admSaved: "คืนค่าเป้าหมายเป็นค่าเริ่มต้นของกลุ่มงานแล้ว" }); },
@@ -913,6 +1015,8 @@ const VM = (() => {
       loginPw: S.loginPw, setLoginPw: e => Store.setState({ loginPw: e.target.value, loginErr: false, loginErrMsg: "" }),
       loginKey: e => { if (e.key === "Enter") doLogin(); },
       loginErr: S.loginErr, loginErrMsg: S.loginErrMsg || "กรุณากรอกชื่อผู้ใช้และรหัสผ่านให้ครบถ้วน",
+      remember: S.remember, toggleRemember: () => Store.setState({ remember: !S.remember }),
+      doLogin,
       forgotOpen: S.forgotOpen,
       openForgot: () => Store.setState({ forgotOpen: true, forgotId: S.loginId || "", forgotPw1: "", forgotPw2: "", forgotMsg: "" }),
       closeForgot: () => Store.setState({ forgotOpen: false, forgotMsg: "" }),
@@ -920,35 +1024,41 @@ const VM = (() => {
       forgotPw1: S.forgotPw1, setForgotPw1: e => Store.setState({ forgotPw1: e.target.value, forgotMsg: "" }),
       forgotPw2: S.forgotPw2, setForgotPw2: e => Store.setState({ forgotPw2: e.target.value, forgotMsg: "" }),
       forgotMsg: S.forgotMsg, doResetPassword,
-      remember: S.remember, toggleRemember: () => Store.setState({ remember: !S.remember }),
-      doLogin,
       logout: () => Store.setState({ auth: false, loginPw: "", loginId: "", loginErr: false, loginErrMsg: "", currentUserId: null }),
       navGroups, roleAbbr: myRole[2], roleLabel: myRole[1], roleScope,
       userName: acct.name, userRole: acct.role, userInitials: acct.ini,
       pageTitle: Ttl[0], pageSub: Ttl[1],
       isDash: page === "dash", isPeople: page === "people", isPerson: page === "person", isAttend: page === "attend", isIdp: page === "idp",
-      isMe: page === "me", isDaily: page === "daily", isAppr: page === "appr", isRoster: page === "roster", isAlumni: page === "alumni",
-      goAttend: () => go("attend"), goPeople: () => go("people"),
-      watchList,
+      isMe: page === "me", isDaily: page === "daily", isAppr: page === "appr", isRoster: page === "roster", isAlumni: page === "alumni", isLeaveReport: page === "leave_report",
+      goAttend: () => go("attend"), goPeople: () => go("people"), goPerson: id => go("person", { sel: id }),
+      watchList, avgHours, avgHoursPct, cpePassCount, idpDonePct, pendingApprCount,
       q: S.q, setQ: e => Store.setState({ q: e.target.value }), track: S.track, setTrack: e => Store.setState({ track: e.target.value }),
-      trackOpts: ["ทุก Career Path"].concat(TRACKS.map(t => t[0])), trackNames: TRACKS.map(t => t[0]),
+      trackOpts: ["ทุก Career Path"].concat(tracks.map(t => t[0])), trackNames: tracks.map(t => t[0]),
       rows, shownCount: rows.length, p: sel_,
       monthTabs, monthName: TH_MFULL[S.month], attendRows, attendCards,
-      idpTabs, idpCards,
-      me, meTabs, tabOverview: S.tab === "overview", tabTrain: S.tab === "train", tabWork: S.tab === "work", tabInterest: S.tab === "interest", tabLeave: S.tab === "leave",
+      idpTabs, idpCards, openAddIdp: () => openModal("idp_new", sel_ ? { personName: sel_.name } : {}),
+      openReviewIdp: () => { if (!sel_) return; openModal(sel_.idp.length ? "idp_edit:" + sel_.id + ":0" : "idp_new", sel_.idp.length ? { goal: sel_.idp[0].goal, action: sel_.idp[0].action, period: sel_.idp[0].period, pct: String(sel_.idp[0].pct) } : { personName: sel_.name }); },
+      printProfile: () => { if (typeof window !== "undefined" && window.print) window.print(); },
+      me, meId, meTabs, tabOverview: S.tab === "overview", tabTrain: S.tab === "train", tabWork: S.tab === "work", tabInterest: S.tab === "interest", tabLeave: S.tab === "leave",
       myCourses, myTalks, myResearch, myLeaveLog,
-      openTrain: () => openModal("train"), openTalk: () => openModal("talk"), openRes: () => openModal("res"),
+      removeCourse, removeTalk, removeResearch,
+      openTrain: () => Store.setState({ __contextPersonId: meId, modal: "train", form: {} }),
+      openTalk: () => Store.setState({ __contextPersonId: meId, modal: "talk", form: {} }),
+      openRes: () => Store.setState({ __contextPersonId: meId, modal: "res", form: {} }),
       tagGroups, confs,
-      aspireTrack: S.aspireTrack || me.track, setAspireTrack: e => Store.setState({ aspireTrack: e.target.value, savedMsg: "" }),
-      aspireSub: S.aspireSub || me.sub, setAspireSub: e => Store.setState({ aspireSub: e.target.value, savedMsg: "" }),
-      aspireYear: S.aspireYear, setAspireYear: e => Store.setState({ aspireYear: e.target.value, savedMsg: "" }),
-      aspireNote: S.aspireNote || me.aspire, setAspireNote: e => Store.setState({ aspireNote: e.target.value, savedMsg: "" }),
+      aspireTrack: me ? aspireState(state, me).track : "", setAspireTrack: e => me && setAspire(state, me.id, { track: e.target.value }),
+      aspireSub: me ? aspireState(state, me).sub : "", setAspireSub: e => me && setAspire(state, me.id, { sub: e.target.value }),
+      aspireYear: me ? aspireState(state, me).year : "ภายใน 2 ปี", setAspireYear: e => me && setAspire(state, me.id, { year: e.target.value }),
+      aspireNote: me ? aspireState(state, me).note : "", setAspireNote: e => me && setAspire(state, me.id, { note: e.target.value }),
       saveAspire: () => Store.setState({ savedMsg: "บันทึกแล้ว · ส่งให้หัวหน้ากลุ่มงานทบทวนแผน IDP ถัดไป" }), savedMsg: S.savedMsg,
-      dailyRows, dailySummary, dailyDate: S.dailyDate, setDailyDate: e => Store.setState({ dailyDate: e.target.value, dailySaved: false }),
-      dailyDateTh: Model.thDate(S.dailyDate), dailySaved: S.dailySaved,
-      markAllWork: () => { const d = {}; activePeople.forEach(p => d[p.id] = "work"); Store.setState({ daily: d, dailySaved: false }); },
-      saveDaily: () => Store.setState({ dailySaved: true }),
-      apprRows, apprStats, rosterRows, alumniRows, alumniCount: ALUMNI.length,
+      dailyRows, dailySummary, dailyDate: S.dailyDate, setDailyDate: e => Store.setState({ dailyDate: e.target.value }),
+      dailyDateTh: Model.thDate(S.dailyDate), dailySaved: !!(S.dailySavedDates || {})[S.dailyDate],
+      markAllWork: () => { const d = {}; activePeople.forEach(p => d[p.id] = "work"); Store.setState({ daily: Object.assign({}, S.daily, { [S.dailyDate]: d }), dailySavedDates: Object.assign({}, S.dailySavedDates, { [S.dailyDate]: false }) }); },
+      saveDaily: () => Store.setState({ dailySavedDates: Object.assign({}, S.dailySavedDates, { [S.dailyDate]: true }) }),
+      apprRows, apprStats, openAddAppr: () => openModal("appr_new"),
+      rosterRows, alumniRows, alumniCount: getAlumni(state).length,
+      reportMonth, setReportMonth: e => Store.setState({ reportMonth: e.target.value }), reportRows,
+      openAddAlumni: () => openModal("alumni_new"),
       modalOpen: !!S.modal, modalTitle: mCfg.title, modalSub: mCfg.sub, modalCta: mCfg.cta, modalFields: mCfg.fields,
       closeModal: () => Store.setState({ modal: null, form: {} }), modalSave: () => saveModal(state)
     };
@@ -1228,20 +1338,20 @@ function renderDash(vals) {
     h("div", { style: "display:grid;grid-template-columns:repeat(5,1fr);gap:14px" },
       card("", h("div", { style: "font-size:11.5px;color:#5c6b67" }, "บุคลากรทั้งหมด"),
         h("div", { style: "display:flex;align-items:baseline;gap:5px;margin-top:6px" }, h("span", { style: "font-size:27px;font-weight:600;letter-spacing:-.5px" }, vals.admTotal), h("span", { style: "font-size:12px;color:#5c6b67" }, "คน")),
-        h("div", { style: "font-size:11px;color:#5c6b67;margin-top:5px" }, "เภสัชกร 33 · จพ.เภสัชกรรม 7")),
+        h("div", { style: "font-size:11px;color:#5c6b67;margin-top:5px" }, "ตามทะเบียนปัจจุบัน")),
       card("", h("div", { style: "font-size:11.5px;color:#5c6b67" }, "ชม.อบรมเฉลี่ย/คน"),
-        h("div", { style: "display:flex;align-items:baseline;gap:5px;margin-top:6px" }, h("span", { style: "font-size:27px;font-weight:600;letter-spacing:-.5px" }, "30.6"), h("span", { style: "font-size:12px;color:#5c6b67" }, "/ 40 ชม.")),
-        h("div", { style: "height:5px;border-radius:3px;background:#e7edeb;margin-top:9px;overflow:hidden" }, h("div", { style: "width:76%;height:100%;background:#0e6b5b" }))),
+        h("div", { style: "display:flex;align-items:baseline;gap:5px;margin-top:6px" }, h("span", { style: "font-size:27px;font-weight:600;letter-spacing:-.5px" }, vals.avgHours), h("span", { style: "font-size:12px;color:#5c6b67" }, "/ " + vals.tHours + " ชม.")),
+        h("div", { style: "height:5px;border-radius:3px;background:#e7edeb;margin-top:9px;overflow:hidden" }, h("div", { style: `width:${vals.avgHoursPct}%;height:100%;background:#0e6b5b` }))),
       card("", h("div", { style: "font-size:11.5px;color:#5c6b67" }, "ผ่านเกณฑ์ CPE"),
-        h("div", { style: "display:flex;align-items:baseline;gap:5px;margin-top:6px" }, h("span", { style: "font-size:27px;font-weight:600;letter-spacing:-.5px" }, "28"), h("span", { style: "font-size:12px;color:#5c6b67" }, "/ 33 คน")),
-        h("div", { style: "font-size:11px;color:#a9640f;margin-top:5px" }, "ต้องติดตาม 5 คน")),
+        h("div", { style: "display:flex;align-items:baseline;gap:5px;margin-top:6px" }, h("span", { style: "font-size:27px;font-weight:600;letter-spacing:-.5px" }, vals.cpePassCount), h("span", { style: "font-size:12px;color:#5c6b67" }, "/ " + vals.admTotal + " คน")),
+        h("div", { style: "font-size:11px;color:#a9640f;margin-top:5px" }, "ต้องติดตาม " + vals.watchList.length + " คน")),
       card("", h("div", { style: "font-size:11.5px;color:#5c6b67" }, "IDP บรรลุเป้าหมาย"),
-        h("div", { style: "display:flex;align-items:baseline;gap:5px;margin-top:6px" }, h("span", { style: "font-size:27px;font-weight:600;letter-spacing:-.5px" }, "62"), h("span", { style: "font-size:12px;color:#5c6b67" }, "%")),
-        h("div", { style: "font-size:11px;color:#5c6b67;margin-top:5px" }, "รอบประเมิน 2/2569")),
+        h("div", { style: "display:flex;align-items:baseline;gap:5px;margin-top:6px" }, h("span", { style: "font-size:27px;font-weight:600;letter-spacing:-.5px" }, vals.idpDonePct), h("span", { style: "font-size:12px;color:#5c6b67" }, "%")),
+        h("div", { style: "font-size:11px;color:#5c6b67;margin-top:5px" }, "จากแผน IDP ที่บันทึกไว้")),
       h("div", { style: "background:#0c2a25;border:1px solid #0c2a25;border-radius:14px;padding:16px 17px;color:#fff" },
         h("div", { style: "font-size:11.5px;color:#8fb6ae" }, "รอดำเนินการ"),
-        h("div", { style: "display:flex;align-items:baseline;gap:5px;margin-top:6px" }, h("span", { style: "font-size:27px;font-weight:600;letter-spacing:-.5px" }, "7"), h("span", { style: "font-size:12px;color:#8fb6ae" }, "รายการ")),
-        h("div", { style: "font-size:11px;color:#8fb6ae;margin-top:5px" }, "ขออนุมัติประชุม 5 · IDP รอทบทวน 2"))
+        h("div", { style: "display:flex;align-items:baseline;gap:5px;margin-top:6px" }, h("span", { style: "font-size:27px;font-weight:600;letter-spacing:-.5px" }, vals.pendingApprCount), h("span", { style: "font-size:12px;color:#8fb6ae" }, "รายการ")),
+        h("div", { style: "font-size:11px;color:#8fb6ae;margin-top:5px" }, "คำขอไปประชุมที่รอบันทึกผล"))
     ),
 
     h("div", { style: "display:grid;grid-template-columns:1.45fr 1fr;gap:14px;margin-top:14px" },
@@ -1337,7 +1447,7 @@ function renderPeople(vals) {
         vals.trackOpts.map(t => h("option", { value: t }, t))
       ),
       h("div", { style: "flex:1" }),
-      h("div", { style: "font-size:12px;color:#5c6b67" }, `แสดง ${vals.shownCount} จาก 40 คน`)
+      h("div", { style: "font-size:12px;color:#5c6b67" }, `แสดง ${vals.shownCount} จาก ${vals.admTotal} คน`)
     ),
     h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;overflow:hidden" },
       h("table", { style: "width:100%;font-size:12.5px" },
@@ -1393,8 +1503,8 @@ function renderPerson(vals) {
         )
       ),
       h("div", { style: "display:flex;flex-direction:column;gap:8px;flex:none" },
-        h("button", { style: "border:0;background:#0e6b5b;color:#fff;padding:9px 15px;border-radius:10px;font-size:12.5px;font-weight:500;cursor:pointer" }, "ทบทวนแผน IDP"),
-        h("button", { style: "border:1px solid #dde5e2;background:#fff;color:#14201d;padding:9px 15px;border-radius:10px;font-size:12.5px;cursor:pointer" }, "พิมพ์แฟ้มประวัติ")
+        h("button", { onClick: vals.openReviewIdp, style: "border:0;background:#0e6b5b;color:#fff;padding:9px 15px;border-radius:10px;font-size:12.5px;font-weight:500;cursor:pointer" }, "ทบทวนแผน IDP"),
+        h("button", { onClick: vals.printProfile, style: "border:1px solid #dde5e2;background:#fff;color:#14201d;padding:9px 15px;border-radius:10px;font-size:12.5px;cursor:pointer" }, "พิมพ์แฟ้มประวัติ")
       )
     ),
 
@@ -1560,7 +1670,7 @@ function renderIdp(vals) {
     h("div", { style: "display:flex;gap:6px;align-items:center;margin-bottom:14px" },
       vals.idpTabs.map(t => h("button", { onClick: t.go, style: "padding:7px 13px;border-radius:9px;font-size:12.5px;cursor:pointer;border:1px solid #dde5e2;" + t.on }, t.label)),
       h("div", { style: "flex:1" }),
-      h("button", { style: "border:0;background:#0e6b5b;color:#fff;padding:9px 15px;border-radius:10px;font-size:12.5px;font-weight:500;cursor:pointer" }, "สร้างแผน IDP รอบใหม่")
+      h("button", { onClick: vals.openAddIdp, style: "border:0;background:#0e6b5b;color:#fff;padding:9px 15px;border-radius:10px;font-size:12.5px;font-weight:500;cursor:pointer" }, "สร้างแผน IDP รอบใหม่")
     ),
     h("div", { style: "display:grid;grid-template-columns:repeat(2,1fr);gap:14px" },
       vals.idpCards.map(c => card("",
@@ -1579,6 +1689,7 @@ function renderIdp(vals) {
         h("div", { style: "display:flex;align-items:center;gap:10px;margin-top:12px" },
           h("div", { style: "flex:1;height:7px;border-radius:4px;background:#e7edeb;overflow:hidden" }, h("div", { style: `height:100%;border-radius:4px;width:${c.pct}%;${c.bar}` })),
           h("span", { style: "font-size:12px;font-weight:600" }, c.pct + "%"),
+          h("button", { onClick: c.edit, style: "border:1px solid #dde5e2;background:#fff;padding:5px 11px;border-radius:8px;font-size:11.5px;cursor:pointer;color:#0e6b5b;font-weight:500" }, "แก้ไข"),
           h("button", { onClick: c.go, style: "border:1px solid #dde5e2;background:#fff;padding:5px 11px;border-radius:8px;font-size:11.5px;cursor:pointer;color:#3d4b47" }, "ดูรายละเอียด")
         )
       ))
@@ -1589,6 +1700,10 @@ function renderIdp(vals) {
 // ==== js\screens\staff.js ====
 function renderMe(vals) {
   const me = vals.me;
+  if (!me) {
+    return card("", h("div", { style: "font-size:14px;font-weight:600" }, "ยังไม่มีข้อมูลบุคลากรในระบบ"),
+      h("div", { style: "font-size:12.5px;color:#5c6b67;margin-top:6px" }, "ให้ผู้ดูแลระบบเพิ่มบุคลากรและผูกบัญชีนี้กับชื่อของคุณก่อน (เมนู สิทธิ์ผู้ใช้งาน)"));
+  }
   return h("div", {},
     h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;padding:20px 22px;display:flex;gap:20px;align-items:flex-start" },
       h("div", { style: "width:60px;height:60px;flex:none;border-radius:16px;font-size:19px;font-weight:600;display:flex;align-items:center;justify-content:center;color:#fff;" + me.avaBg }, me.ini),
@@ -1654,14 +1769,15 @@ function renderMeTrain(vals) {
     h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;overflow:hidden" },
       h("table", { style: "width:100%;font-size:12.5px" },
         h("thead", {}, h("tr", { style: "background:#f7faf9;color:#5c6b67;font-size:11px;text-align:left" },
-          h("th", { style: "padding:10px 20px;font-weight:500;width:100px" }, "วันที่"), h("th", { style: "padding:10px 12px;font-weight:500" }, "หลักสูตร / การประชุม"),
+          h("th", { style: "padding:10px 20px;font-weight:500;width:130px" }, "วันที่"), h("th", { style: "padding:10px 12px;font-weight:500" }, "หลักสูตร / การประชุม"),
           h("th", { style: "padding:10px 12px;font-weight:500" }, "ผู้จัด"), h("th", { style: "padding:10px 12px;font-weight:500" }, "ประเภท"),
-          h("th", { style: "padding:10px 12px;font-weight:500;text-align:right" }, "ชม."), h("th", { style: "padding:10px 20px;font-weight:500" }, "สถานะ")
+          h("th", { style: "padding:10px 20px;font-weight:500" }, "สถานะ"), h("th", { style: "padding:10px 20px;font-weight:500" })
         )),
         h("tbody", {}, vals.myCourses.map(c => h("tr", { style: "border-top:1px solid #eef2f1" },
           h("td", { style: "padding:10px 20px;color:#5c6b67;white-space:nowrap" }, c.date), h("td", { style: "padding:10px 12px" }, c.title),
           h("td", { style: "padding:10px 12px;color:#5c6b67" }, c.org), h("td", { style: "padding:10px 12px" }, h("span", { style: "padding:2px 8px;border-radius:6px;background:#f2f5f4;font-size:11px;color:#3d4b47" }, c.type)),
-          h("td", { style: "padding:10px 12px;text-align:right;font-weight:600" }, c.hours), h("td", { style: "padding:10px 20px" }, h("span", { style: "padding:2px 9px;border-radius:20px;font-size:11px;" + c.chip }, c.status))
+          h("td", { style: "padding:10px 20px" }, h("span", { style: "padding:2px 9px;border-radius:20px;font-size:11px;" + c.chip }, c.status)),
+          h("td", { style: "padding:10px 20px;text-align:right" }, h("button", { onClick: () => vals.removeCourse(c.idx), style: "border:1px solid #f1cdc8;background:#fff;padding:4px 10px;border-radius:8px;font-size:11px;cursor:pointer;color:#8f231b" }, "ลบ"))
         )))
       )
     )
@@ -1673,17 +1789,21 @@ function renderMeWork(vals) {
     card("",
       h("div", { style: "display:flex;align-items:baseline;justify-content:space-between" }, h("div", { style: "font-size:14px;font-weight:600" }, "ประวัติเป็นวิทยากร"), h("button", { onClick: vals.openTalk, style: "border:1px solid #dde5e2;background:#fff;padding:6px 12px;border-radius:9px;font-size:12px;cursor:pointer;color:#0e6b5b;font-weight:500" }, "+ เพิ่ม")),
       h("div", { style: "margin-top:13px;display:flex;flex-direction:column;gap:11px" },
-        vals.myTalks.map(t => h("div", { style: "border:1px solid #e7edeb;border-radius:11px;padding:12px 13px" },
-          h("div", { style: "font-size:12.5px;font-weight:500;line-height:1.5" }, t.topic), h("div", { style: "font-size:11px;color:#5c6b67;margin-top:4px" }, t.venue + " · " + t.date + " · ผู้ฟัง " + t.aud)))
+        vals.myTalks.map(t => h("div", { style: "border:1px solid #e7edeb;border-radius:11px;padding:12px 13px;display:flex;gap:10px;align-items:flex-start" },
+          h("div", { style: "flex:1;min-width:0" }, h("div", { style: "font-size:12.5px;font-weight:500;line-height:1.5" }, t.topic), h("div", { style: "font-size:11px;color:#5c6b67;margin-top:4px" }, t.venue + " · " + t.date)),
+          h("button", { onClick: () => vals.removeTalk(t.idx), style: "border:1px solid #f1cdc8;background:#fff;padding:4px 10px;border-radius:8px;font-size:11px;cursor:pointer;color:#8f231b;flex:none" }, "ลบ")
+        ))
       )
     ),
     card("",
       h("div", { style: "display:flex;align-items:baseline;justify-content:space-between" }, h("div", { style: "font-size:14px;font-weight:600" }, "งานวิจัย / R2R"), h("button", { onClick: vals.openRes, style: "border:1px solid #dde5e2;background:#fff;padding:6px 12px;border-radius:9px;font-size:12px;cursor:pointer;color:#0e6b5b;font-weight:500" }, "+ เพิ่ม")),
       h("div", { style: "margin-top:13px;display:flex;flex-direction:column;gap:11px" },
-        vals.myResearch.map(r => h("div", { style: "border:1px solid #e7edeb;border-radius:11px;padding:12px 13px" },
-          h("div", { style: "font-size:12.5px;font-weight:500;line-height:1.5" }, r.title),
-          h("div", { style: "display:flex;align-items:center;gap:8px;margin-top:6px" }, h("span", { style: "font-size:11px;color:#5c6b67" }, r.role), h("span", { style: "padding:2px 8px;border-radius:6px;font-size:10.5px;" + r.chip }, r.status)))
-        )
+        vals.myResearch.map(r => h("div", { style: "border:1px solid #e7edeb;border-radius:11px;padding:12px 13px;display:flex;gap:10px;align-items:flex-start" },
+          h("div", { style: "flex:1;min-width:0" },
+            h("div", { style: "font-size:12.5px;font-weight:500;line-height:1.5" }, r.title),
+            h("div", { style: "display:flex;align-items:center;gap:8px;margin-top:6px" }, h("span", { style: "font-size:11px;color:#5c6b67" }, r.role), h("span", { style: "padding:2px 8px;border-radius:6px;font-size:10.5px;" + r.chip }, r.status))),
+          h("button", { onClick: () => vals.removeResearch(r.idx), style: "border:1px solid #f1cdc8;background:#fff;padding:4px 10px;border-radius:8px;font-size:11px;cursor:pointer;color:#8f231b;flex:none" }, "ลบ")
+        ))
       )
     )
   );
@@ -1773,7 +1893,7 @@ function renderMeLeave(vals) {
         h("div", { style: "font-size:14px;font-weight:600;color:#8a5310" }, "โควตามาสาย"),
         h("div", { style: "display:flex;align-items:baseline;gap:8px;margin-top:8px" }, h("span", { style: "font-size:30px;font-weight:600;color:#8a5310;letter-spacing:-.5px" }, me.lateLeft), h("span", { style: "font-size:12.5px;color:#8a5310" }, "ครั้งที่เหลือ จากโควตา " + vals.tLate + " ครั้ง/ปี")),
         h("div", { style: "height:8px;border-radius:5px;background:#f6e4c6;overflow:hidden;margin-top:11px" }, h("div", { style: `height:100%;border-radius:5px;background:#c9821c;width:${me.latePct}%` })),
-        h("div", { style: "font-size:11.5px;color:#8a5310;margin-top:9px" }, "ใช้ไป " + me.lateUsed + " ครั้ง · ครั้งล่าสุด 12 ส.ค. 2569 (08:42)")
+        h("div", { style: "font-size:11.5px;color:#8a5310;margin-top:9px" }, "ใช้ไป " + me.lateUsed + " ครั้ง (นับจากบันทึกมาปฏิบัติงานรายวัน)")
       )
     ),
     h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;overflow:hidden" },
@@ -1807,15 +1927,13 @@ function renderDaily(vals) {
     h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;overflow:hidden" },
       h("table", { style: "width:100%;font-size:12.5px" },
         h("thead", {}, h("tr", { style: "background:#f7faf9;color:#5c6b67;font-size:11px;text-align:left" },
-          h("th", { style: "padding:10px 20px;font-weight:500" }, "ชื่อ – สกุล"), h("th", { style: "padding:10px 12px;font-weight:500" }, "หน่วยงาน"), h("th", { style: "padding:10px 12px;font-weight:500" }, "เวลาเข้า"),
-          h("th", { style: "padding:10px 20px;font-weight:500;width:430px" }, "สถานะการมาปฏิบัติงาน"), h("th", { style: "padding:10px 20px;font-weight:500" }, "หมายเหตุ")
+          h("th", { style: "padding:10px 20px;font-weight:500" }, "ชื่อ – สกุล"), h("th", { style: "padding:10px 12px;font-weight:500" }, "หน่วยงาน"),
+          h("th", { style: "padding:10px 20px;font-weight:500" }, "สถานะการมาปฏิบัติงาน")
         )),
         h("tbody", {}, vals.dailyRows.map(r => h("tr", { style: "border-top:1px solid #eef2f1" },
           h("td", { style: "padding:8px 20px" }, h("div", { style: "font-weight:500" }, r.name), h("div", { style: "font-size:10.5px;color:#5c6b67" }, r.pos)),
           h("td", { style: "padding:8px 12px;color:#5c6b67" }, r.unit),
-          h("td", { style: "padding:8px 12px;font-variant-numeric:tabular-nums;" + r.timeStyle }, r.time),
-          h("td", { style: "padding:8px 20px" }, h("div", { style: "display:flex;gap:5px" }, r.opts.map(o => h("button", { onClick: o.set, style: "padding:5px 10px;border-radius:8px;font-size:11.5px;cursor:pointer;white-space:nowrap;" + o.on }, o.label)))),
-          h("td", { style: "padding:8px 20px;color:#5c6b67;font-size:11.5px" }, r.note)
+          h("td", { style: "padding:8px 20px" }, h("div", { style: "display:flex;gap:5px;flex-wrap:wrap" }, r.opts.map(o => h("button", { onClick: o.set, style: "padding:5px 10px;border-radius:8px;font-size:11.5px;cursor:pointer;white-space:nowrap;" + o.on }, o.label))))
         )))
       )
     )
@@ -1825,7 +1943,7 @@ function renderDaily(vals) {
 function renderAppr(vals) {
   return h("div", {},
     h("div", { style: "display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px" },
-      h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:12px;padding:14px 16px" }, h("div", { style: "font-size:11px;color:#5c6b67" }, "คำขอทั้งหมด (ปีงบ 69)"), h("div", { style: "font-size:22px;font-weight:600;margin-top:3px" }, vals.apprStats.total)),
+      h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:12px;padding:14px 16px" }, h("div", { style: "font-size:11px;color:#5c6b67" }, "คำขอทั้งหมด"), h("div", { style: "font-size:22px;font-weight:600;margin-top:3px" }, vals.apprStats.total)),
       h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:12px;padding:14px 16px" }, h("div", { style: "font-size:11px;color:#5c6b67" }, "อนุมัติแล้ว"), h("div", { style: "font-size:22px;font-weight:600;margin-top:3px;color:#0e6b5b" }, vals.apprStats.ok)),
       h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:12px;padding:14px 16px" }, h("div", { style: "font-size:11px;color:#5c6b67" }, "ไม่อนุมัติ"), h("div", { style: "font-size:22px;font-weight:600;margin-top:3px;color:#b0332a" }, vals.apprStats.no)),
       h("div", { style: "background:#fdf1e0;border:1px solid #f2ddba;border-radius:12px;padding:14px 16px" }, h("div", { style: "font-size:11px;color:#8a5310" }, "รอบันทึกผล"), h("div", { style: "font-size:22px;font-weight:600;margin-top:3px;color:#8a5310" }, vals.apprStats.wait))
@@ -1833,7 +1951,7 @@ function renderAppr(vals) {
     h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;overflow:hidden" },
       h("div", { style: "padding:16px 20px 12px;display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid #eef2f1" },
         h("div", {}, h("div", { style: "font-size:14px;font-weight:600" }, "ทะเบียนคำขอไปประชุม / อบรม"), h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, "เลขาบันทึกผลการอนุมัติตามหนังสือที่ได้รับกลับ")),
-        h("button", { style: "border:1px solid #dde5e2;background:#fff;padding:7px 13px;border-radius:9px;font-size:12px;cursor:pointer;color:#3d4b47" }, "ส่งออกทะเบียน")
+        h("button", { onClick: vals.openAddAppr, style: "border:0;background:#0e6b5b;color:#fff;padding:8px 15px;border-radius:9px;font-size:12.5px;font-weight:500;cursor:pointer" }, "+ เพิ่มคำขอ")
       ),
       h("table", { style: "width:100%;font-size:12.5px" },
         h("thead", {}, h("tr", { style: "background:#f7faf9;color:#5c6b67;font-size:11px;text-align:left" },
@@ -1847,7 +1965,35 @@ function renderAppr(vals) {
           h("td", { style: "padding:9px 12px;text-align:right;font-variant-numeric:tabular-nums" }, a.budget),
           h("td", { style: "padding:9px 12px;color:#5c6b67;font-variant-numeric:tabular-nums" }, a.doc),
           h("td", { style: "padding:9px 12px" }, h("span", { style: "padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;" + a.chip }, a.status)),
-          h("td", { style: "padding:9px 20px;text-align:right" }, h("button", { onClick: a.record, style: "border:1px solid #dde5e2;background:#fff;padding:5px 11px;border-radius:8px;font-size:11.5px;cursor:pointer;color:#0e6b5b;font-weight:500" }, "บันทึกผล"))
+          h("td", { style: "padding:9px 20px;text-align:right" }, h("div", { style: "display:flex;gap:6px;justify-content:flex-end" },
+            h("button", { onClick: a.record, style: "border:1px solid #dde5e2;background:#fff;padding:5px 11px;border-radius:8px;font-size:11.5px;cursor:pointer;color:#0e6b5b;font-weight:500" }, "บันทึกผล"),
+            h("button", { onClick: a.remove, style: "border:1px solid #f1cdc8;background:#fff;padding:5px 11px;border-radius:8px;font-size:11.5px;cursor:pointer;color:#8f231b" }, "ลบ")))
+        )))
+      )
+    )
+  );
+}
+
+function renderLeaveReport(vals) {
+  return h("div", {},
+    h("div", { style: "display:flex;gap:10px;align-items:center;margin-bottom:14px" },
+      h("div", {}, h("div", { style: "font-size:11px;color:#5c6b67;margin-bottom:5px" }, "เดือนที่ต้องการดูรายงาน"), h("input", { value: vals.reportMonth, onInput: vals.setReportMonth, type: "month", style: "padding:8px 12px;border:1px solid #dde5e2;border-radius:9px;outline:none" })),
+      h("div", { style: "flex:1" }),
+      h("div", { style: "font-size:12px;color:#5c6b67" }, "สรุปจากข้อมูลที่บันทึกในหน้า 'บันทึกมาปฏิบัติงาน' เท่านั้น")
+    ),
+    h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;overflow:hidden" },
+      h("table", { style: "width:100%;font-size:12.5px" },
+        h("thead", {}, h("tr", { style: "background:#f7faf9;color:#5c6b67;font-size:11px;text-align:left" },
+          h("th", { style: "padding:10px 20px;font-weight:500" }, "ชื่อ – สกุล"), h("th", { style: "padding:10px 12px;font-weight:500" }, "หน่วยงาน"),
+          h("th", { style: "padding:10px 12px;font-weight:500;text-align:center" }, "ลาพักผ่อน"), h("th", { style: "padding:10px 12px;font-weight:500;text-align:center" }, "ลาป่วย"),
+          h("th", { style: "padding:10px 12px;font-weight:500;text-align:center" }, "ลากิจ"), h("th", { style: "padding:10px 12px;font-weight:500;text-align:center" }, "มาสาย"),
+          h("th", { style: "padding:10px 20px;font-weight:500;text-align:center" }, "ไปประชุมนอกสถานที่")
+        )),
+        h("tbody", {}, vals.reportRows.map(r => h("tr", { style: "border-top:1px solid #eef2f1" },
+          h("td", { style: "padding:9px 20px;font-weight:500" }, r.name), h("td", { style: "padding:9px 12px;color:#5c6b67" }, r.unit),
+          h("td", { style: "padding:9px 12px;text-align:center" }, r.vacation || "–"), h("td", { style: "padding:9px 12px;text-align:center" }, r.sick || "–"),
+          h("td", { style: "padding:9px 12px;text-align:center" }, r.personal || "–"), h("td", { style: "padding:9px 12px;text-align:center;color:#8a5310" }, r.late || "–"),
+          h("td", { style: "padding:9px 20px;text-align:center;color:#1d6fa5" }, r.trip || "–")
         )))
       )
     )
@@ -1859,7 +2005,7 @@ function renderRoster(vals) {
     h("div", { style: "display:flex;gap:10px;align-items:center;margin-bottom:14px" },
       h("input", { value: vals.q, onInput: vals.setQ, placeholder: "ค้นหาชื่อ / ตำแหน่ง", style: "flex:1;max-width:320px;padding:9px 13px;border:1px solid #dde5e2;border-radius:10px;background:#fff;outline:none" }),
       h("div", { style: "flex:1" }),
-      h("div", { style: "font-size:12px;color:#5c6b67" }, "บุคลากรอยู่ 40 คน"),
+      h("div", { style: "font-size:12px;color:#5c6b67" }, "บุคลากรอยู่ " + vals.rosterRows.length + " คน"),
       h("button", { onClick: vals.openAddPerson, style: "border:0;background:#0e6b5b;color:#fff;padding:9px 15px;border-radius:10px;font-size:12.5px;font-weight:500;cursor:pointer" }, "+ เพิ่มบุคลากรใหม่")
     ),
     h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;overflow:hidden" },
@@ -1867,7 +2013,7 @@ function renderRoster(vals) {
         h("thead", {}, h("tr", { style: "background:#f7faf9;color:#5c6b67;font-size:11px;text-align:left" },
           h("th", { style: "padding:10px 20px;font-weight:500" }, "ลำดับ"), h("th", { style: "padding:10px 12px;font-weight:500" }, "ชื่อ – สกุล"), h("th", { style: "padding:10px 12px;font-weight:500" }, "ตำแหน่ง / ระดับ"),
           h("th", { style: "padding:10px 12px;font-weight:500" }, "หน่วยงาน"), h("th", { style: "padding:10px 12px;font-weight:500" }, "ประเภทการจ้าง"), h("th", { style: "padding:10px 12px;font-weight:500" }, "วันเริ่มปฏิบัติงาน"),
-          h("th", { style: "padding:10px 12px;font-weight:500" }, "วันที่ลาออก"), h("th", { style: "padding:10px 20px;font-weight:500" }, "อายุงาน")
+          h("th", { style: "padding:10px 20px;font-weight:500" }, "อายุงาน")
         )),
         h("tbody", {}, vals.rosterRows.map(r => h("tr", { style: "border-top:1px solid #eef2f1" },
           h("td", { style: "padding:9px 20px;color:#8a968f;font-variant-numeric:tabular-nums" }, r.no),
@@ -1876,7 +2022,6 @@ function renderRoster(vals) {
           h("td", { style: "padding:9px 12px;color:#5c6b67" }, r.unit),
           h("td", { style: "padding:9px 12px" }, h("span", { style: "padding:2px 8px;border-radius:6px;font-size:11px;" + r.empChip }, r.emp)),
           h("td", { style: "padding:9px 12px;white-space:nowrap" }, r.startTh),
-          h("td", { style: "padding:9px 12px;color:#8a968f" }, "–"),
           h("td", { style: "padding:9px 20px;white-space:nowrap" }, r.tenure)
         )))
       )
@@ -1889,7 +2034,7 @@ function renderAlumni(vals) {
     h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;overflow:hidden" },
       h("div", { style: "padding:16px 20px 12px;display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid #eef2f1" },
         h("div", {}, h("div", { style: "font-size:14px;font-weight:600" }, "ประวัติผู้ที่เคยปฏิบัติงานในกลุ่มงานเภสัชกรรม"), h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, "รวม " + vals.alumniCount + " คน · เก็บไว้เพื่ออ้างอิงและออกหนังสือรับรอง")),
-        h("button", { style: "border:1px solid #dde5e2;background:#fff;padding:7px 13px;border-radius:9px;font-size:12px;cursor:pointer;color:#3d4b47" }, "+ บันทึกผู้ลาออก")
+        h("button", { onClick: vals.openAddAlumni, style: "border:1px solid #dde5e2;background:#fff;padding:7px 13px;border-radius:9px;font-size:12px;cursor:pointer;color:#3d4b47" }, "+ บันทึกผู้ลาออก")
       ),
       h("table", { style: "width:100%;font-size:12.5px" },
         h("thead", {}, h("tr", { style: "background:#f7faf9;color:#5c6b67;font-size:11px;text-align:left" },
@@ -2011,10 +2156,10 @@ function renderAdmTarget(vals) {
             h("span", { style: `width:9px;height:9px;flex:none;border-radius:3px;${t.dot}` }),
             h("div", { style: "flex:1;min-width:0" }, h("div", { style: "font-size:12.5px;font-weight:500;line-height:1.4" }, t.name), h("div", { style: "font-size:10.5px;color:#5c6b67" }, t.unit)),
             h("span", { style: "font-size:11.5px;color:#5c6b67;white-space:nowrap" }, t.count),
-            h("button", { style: "border:1px solid #dde5e2;background:#fff;padding:4px 10px;border-radius:8px;font-size:11px;cursor:pointer;color:#0e6b5b" }, "แก้ไข")
+            h("button", { onClick: t.edit, style: "border:1px solid #dde5e2;background:#fff;padding:4px 10px;border-radius:8px;font-size:11px;cursor:pointer;color:#0e6b5b" }, "แก้ไข")
           ))
         ),
-        h("button", { style: "width:100%;margin-top:14px;border:1px dashed #a9c4bd;background:#f7faf9;color:#0e6b5b;padding:11px;border-radius:10px;font-size:12.5px;cursor:pointer;font-weight:500" }, "+ เพิ่มสาย Career Path")
+        h("button", { onClick: vals.openAddTrack, style: "width:100%;margin-top:14px;border:1px dashed #a9c4bd;background:#f7faf9;color:#0e6b5b;padding:11px;border-radius:10px;font-size:12.5px;cursor:pointer;font-weight:500" }, "+ เพิ่มสาย Career Path")
       )
     )
   );
@@ -2061,7 +2206,13 @@ function renderModal(vals) {
         vals.modalFields.map(f => h("div", {},
           h("div", { style: "font-size:11.5px;color:#5c6b67;margin-bottom:6px" }, f.label),
           f.isSelect ? h("select", { value: f.value, onChange: f.set, style: "width:100%;padding:9px 12px;border:1px solid #dde5e2;border-radius:9px;background:#fff;outline:none" }, f.options.map(o => h("option", { value: o }, o)))
-          : f.isFile ? h("button", { onClick: f.set, style: "width:100%;border:1px dashed #a9c4bd;background:#f7faf9;color:#0e6b5b;padding:14px;border-radius:10px;font-size:12.5px;cursor:pointer;font-weight:500" }, f.value)
+          : f.isDate ? h("input", { value: f.value, onInput: f.set, type: "date", style: "width:100%;padding:9px 12px;border:1px solid #dde5e2;border-radius:9px;outline:none" })
+          : f.isFile ? h("div", {},
+              h("label", { style: "display:block;width:100%;border:1px dashed #a9c4bd;background:#f7faf9;color:#0e6b5b;padding:14px;border-radius:10px;font-size:12.5px;cursor:pointer;font-weight:500;text-align:center;box-sizing:border-box" },
+                f.value,
+                h("input", { type: "file", onChange: f.set, style: "display:none" })
+              )
+            )
           : h("input", { value: f.value, onInput: f.set, placeholder: f.ph, style: "width:100%;padding:9px 12px;border:1px solid #dde5e2;border-radius:9px;outline:none" })
         )),
         h("div", { style: "display:flex;gap:9px;justify-content:flex-end;margin-top:5px" },
@@ -2161,6 +2312,7 @@ function resolveScreen(vals) {
   if (vals.isAppr) return h("div", {}, renderAdmBanner(vals), renderAppr(vals));
   if (vals.isRoster) return h("div", {}, renderAdmBanner(vals), renderRoster(vals));
   if (vals.isAlumni) return h("div", {}, renderAdmBanner(vals), renderAlumni(vals));
+  if (vals.isLeaveReport) return h("div", {}, renderAdmBanner(vals), renderLeaveReport(vals));
   if (vals.isAdmPeople) return h("div", {}, renderAdmBanner(vals), renderAdmPeople(vals));
   if (vals.isAdmConf) return h("div", {}, renderAdmBanner(vals), renderAdmConf(vals));
   if (vals.isAdmTarget) return h("div", {}, renderAdmBanner(vals), renderAdmTarget(vals));
