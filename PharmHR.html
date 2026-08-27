@@ -22,14 +22,100 @@ table{border-collapse:collapse}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .hoverable:hover{background:#f7faf9}
 
+/* ---- Layout building blocks (used instead of one-off inline grid/flex rules so the
+   mobile breakpoint below can actually override them — an external stylesheet can't
+   beat an inline style without matching selectors). ---- */
+.app-shell{display:flex;min-height:100vh;align-items:stretch}
+.app-sidebar{width:254px;flex:none;background:#0c2a25;color:#cfe2dc;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.app-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.app-content{padding:24px 30px 70px;animation:fadeUp .25s ease both}
+.table-scroll{overflow-x:auto}
+.table-scroll table{min-width:640px}
+.grid-5{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.grid-6{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid-2b{display:grid;grid-template-columns:1fr 1.2fr;gap:14px}
+.grid-dash-top{display:grid;grid-template-columns:1.45fr 1fr;gap:14px}
+.grid-profile{display:grid;grid-template-columns:1.5fr 1fr;gap:14px}
+.grid-target{display:grid;grid-template-columns:1.3fr 1fr;gap:14px}
+.filter-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.modal-box{width:560px;max-width:100%;max-height:100%;overflow:auto}
+.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+
+@media (max-width: 860px){
+  .app-shell{flex-direction:column}
+  .app-sidebar{width:100%;height:auto;position:static;flex-direction:column}
+  .app-sidebar nav{max-height:none}
+  .app-content{padding:14px}
+  .grid-3,.grid-2,.grid-2b,.grid-dash-top,.grid-profile,.grid-target{grid-template-columns:1fr}
+  .grid-5,.grid-4,.grid-6{grid-template-columns:1fr 1fr;gap:9px}
+  .calendar-grid{grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;font-size:10px}
+  header{flex-wrap:wrap;padding:10px 14px !important;gap:10px !important}
+  header > div:last-child{display:none}
+  .filter-row{align-items:stretch}
+  .filter-row > *{width:100%}
+  .filter-row > select,.filter-row > input{max-width:none !important}
+  .modal-overlay{padding:0 !important}
+  .modal-box{width:100%;height:100%;max-height:100%;border-radius:0 !important}
+}
+
+@media print{
+  .app-sidebar, header, .no-print, button{display:none !important}
+  .app-shell{display:block}
+  .app-main{display:block}
+  .app-content{padding:0;animation:none}
+  body{background:#fff}
+  .print-profile{font-size:9px;line-height:1.15 !important}
+  .print-profile *{line-height:1.15 !important}
+  .print-profile .grid-profile{grid-template-columns:1.5fr 1fr;gap:6px}
+  .print-profile *{box-shadow:none !important;animation:none !important}
+  .print-profile > div{padding:0 !important;margin-top:0 !important}
+
+  /* Compact every card/section so the profile dossier fits one A4 page — inline
+     styles set per element can't be beaten without matching selectors, so these
+     target the exact gap/margin-top/font-size values used in chief.js's renderPerson. */
+  .print-profile .card, .print-profile .profile-header, .print-profile .kpi-dark{padding:5px 6px !important;border-radius:7px !important}
+  .print-profile th, .print-profile td{padding:2px 6px !important}
+  .print-profile table{font-size:8px !important}
+  .print-profile [style*="gap:26px"]{gap:8px !important}
+  .print-profile [style*="gap:20px"]{gap:7px !important}
+  .print-profile [style*="gap:16px"]{gap:6px !important}
+  .print-profile [style*="gap:14px"]{gap:5px !important}
+  .print-profile [style*="gap:13px"]{gap:5px !important}
+  .print-profile [style*="gap:12px"]{gap:4px !important}
+  .print-profile [style*="gap:11px"]{gap:4px !important}
+  .print-profile [style*="gap:10px"]{gap:4px !important}
+  .print-profile [style*="gap:9px"]{gap:3px !important}
+  .print-profile [style*="margin-top:18px"]{margin-top:5px !important}
+  .print-profile [style*="margin-top:16px"]{margin-top:5px !important}
+  .print-profile [style*="margin-top:15px"]{margin-top:4px !important}
+  .print-profile [style*="margin-top:14px"]{margin-top:4px !important}
+  .print-profile [style*="margin-top:13px"]{margin-top:4px !important}
+  .print-profile [style*="margin-top:12px"]{margin-top:3px !important}
+  .print-profile [style*="margin-top:9px"]{margin-top:3px !important}
+  .print-profile [style*="font-size:20px"]{font-size:14px !important}
+  .print-profile [style*="font-size:19px"]{font-size:13px !important}
+  .print-profile [style*="font-size:18px"]{font-size:12px !important}
+  .print-profile [style*="font-size:15px"]{font-size:11px !important}
+  .print-profile [style*="font-size:14px"]{font-size:10px !important}
+  .print-profile [style*="font-size:13px"]{font-size:9.5px !important}
+  .print-profile [style*="font-size:12.5px"]{font-size:9px !important}
+  .print-profile [style*="font-size:12px"]{font-size:8.5px !important}
+  .print-profile [style*="font-size:11.5px"]{font-size:8px !important}
+  .print-profile [style*="font-size:11px"]{font-size:8px !important}
+  .print-profile [style*="font-size:10.5px"]{font-size:7.5px !important}
+  @page{size:A4;margin:8mm}
+}
+
 </style>
 </head>
 <body>
 <div id="root"></div>
-<!-- Optional cross-device sync (see SETUP-SYNC.md). Harmless if SUPABASE_ENABLED stays false below. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
-// ==== js\supabase-config.js ====
 // Fill this in with your own Supabase project's URL and anon key, then set
 // SUPABASE_ENABLED to true. Until then the app keeps working exactly as before —
 // each browser only sees its own data (saved to its local storage).
@@ -43,7 +129,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const SUPABASE_ENABLED = true;
 
-// ==== js\remote-sync.js ====
+
 // Optional cross-device sync via Supabase (Postgres). Only activates when
 // SUPABASE_ENABLED is true and SUPABASE_URL/SUPABASE_ANON_KEY (see
 // supabase-config.js) are filled in — otherwise every function here is a harmless
@@ -132,7 +218,7 @@ const RemoteSync = (() => {
   return { init, push, uploadFile };
 })();
 
-// ==== js\data.js ====
+
 // Reference data + option lists. RAW/CONFS_SEED/ALUMNI/APPR_SEED all start empty —
 // this deployment is used for real recording, not the design mockup's demo data.
 const TH_M = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
@@ -197,10 +283,20 @@ const DEFAULT_USERS = [
 
 const DEF_TARGETS = { hours: 40, cpe: 30, talks: 2, res: 1, late: 12, vacJr: 10, vacSr: 20, idp: 80 };
 
+// Types of calendar activity the secretary can record per person/day, with a display color each.
+const CALENDAR_EVENT_TYPES = [
+  ["ลาพักร้อน", "#0e6b5b"],
+  ["ลากิจ", "#2a5f8f"],
+  ["ประชุมในโรงพยาบาล", "#6b7a1e"],
+  ["ประชุมนอกโรงพยาบาล", "#1d6fa5"],
+  ["งานประชุมบริษัทยา", "#5d4a9c"],
+  ["ไปเป็นวิทยากร", "#a9640f"]
+];
+
 const NAV = {
   chief: [["ภาพรวม", [["dash", "Dashboard พัฒนาบุคลากร", ""], ["people", "ข้อมูลบุคลากร", "40"]]], ["การพัฒนาและวิจัย", [["idp", "แผน IDP รายบุคคล", "40"], ["attend", "ขาด ลา มาสาย", ""]]]],
   staff: [["ของฉัน", [["me", "โปรไฟล์ของฉัน", ""]]]],
-  sec: [["งานประจำวัน", [["daily", "บันทึกมาปฏิบัติงาน", ""], ["appr", "ผลอนุมัติไปประชุม", "4"], ["leave_report", "รายงานวันลารายเดือน", ""]]], ["ทะเบียนบุคลากร", [["roster", "รายชื่อบุคลากรปัจจุบัน", "40"], ["alumni", "ประวัติผู้เคยปฏิบัติงาน", "8"]]]],
+  sec: [["งานประจำวัน", [["daily", "บันทึกมาปฏิบัติงาน", ""], ["calendar", "ปฏิทินกิจกรรม", ""], ["appr", "ผลอนุมัติไปประชุม", "4"], ["leave_report", "รายงานวันลารายเดือน", ""]]], ["ทะเบียนบุคลากร", [["roster", "รายชื่อบุคลากรปัจจุบัน", "40"], ["alumni", "ประวัติผู้เคยปฏิบัติงาน", "8"]]]],
   admin: [["จัดการข้อมูลหลัก", [["adm_people", "ทะเบียนบุคลากร", ""], ["adm_conf", "งานประชุม / คอร์สอบรม", ""]]], ["ตั้งค่าระบบ", [["adm_target", "เป้าหมายและ KPI", ""], ["adm_user", "สิทธิ์ผู้ใช้งาน", ""]]]]
 };
 
@@ -212,6 +308,7 @@ const TITLES = {
   idp: ["แผนพัฒนารายบุคคล (IDP)", "รอบประเมิน 2/2569 · ติดตามความก้าวหน้าของทุกคน"],
   me: ["โปรไฟล์ของฉัน", "รายงานการพัฒนาตนเอง ความสนใจ และสิทธิวันลา"],
   daily: ["บันทึกการมาปฏิบัติงานรายวัน", "เลขากลุ่มงาน · บันทึกสถานะรายบุคคลทุกวันทำการ"],
+  calendar: ["ปฏิทินกิจกรรม", "บันทึกวันลา ประชุม และการเป็นวิทยากรของแต่ละคนในแต่ละวัน"],
   appr: ["ผลการอนุมัติไปประชุม / อบรม", "บันทึกผลจากหนังสือตอบกลับ เพื่อเข้าแฟ้มพัฒนาบุคลากร"],
   leave_report: ["รายงานวันลารายเดือน", "สรุปจำนวนครั้ง/วันที่บันทึกจากหน้าบันทึกมาปฏิบัติงานรายวัน"],
   roster: ["ทะเบียนรายชื่อบุคลากร", "วันเริ่มปฏิบัติงาน ประเภทการจ้าง และอายุงาน"],
@@ -222,7 +319,7 @@ const TITLES = {
   adm_user: ["สิทธิ์ผู้ใช้งาน", "กำหนดบทบาทและสถานะบัญชีผู้ใช้ในระบบ"]
 };
 
-// ==== js\model.js ====
+
 // Pure helper functions + the "build people" derivation. Courses/talks/research/IDP/
 // tags/aspirations are read from real per-person records in state (added through the
 // app), NOT fabricated — this deployment records real data, not mockup demo data.
@@ -389,7 +486,7 @@ const Model = (() => {
   return { ini, stageIdx, stageName, positionGroup, sortPeople, hash, thDate, tenure, kpiOf, trackShortLabel, getTracks, countLeave, build, invalidate };
 })();
 
-// ==== js\store.js ====
+
 // Central mutable state. Everything persists to this browser's local storage; the
 // SHARED_KEYS subset also syncs through RemoteSync (Supabase) when that's configured,
 // so multiple computers can see the same roster/records — see remote-sync.js.
@@ -407,6 +504,7 @@ const Store = (() => {
     coursesByPerson: {}, talksByPerson: {}, researchByPerson: {}, idpByPerson: {},
     tagsByPerson: {}, aspireByPerson: {}, savedMsg: "",
     conf: {}, daily: {}, dailySavedDates: {}, dailyDate: "2026-08-26",
+    calendarEvents: [], calMonth: "2026-08",
     modal: null, form: {}, __contextPersonId: null
   });
 
@@ -414,7 +512,7 @@ const Store = (() => {
   // your own login session). Never pushed to or overwritten by other devices.
   const SESSION_KEYS = [
     "auth", "loginRole", "remember", "currentUserId",
-    "role", "page", "tab", "sel", "month", "reportMonth", "q", "track", "idpFilter", "admQ", "dailyDate"
+    "role", "page", "tab", "sel", "month", "reportMonth", "q", "track", "idpFilter", "admQ", "dailyDate", "calMonth"
   ];
 
   // The actual data: rosters, accounts, records — this is what should look the same
@@ -422,7 +520,7 @@ const Store = (() => {
   const SHARED_KEYS = [
     "newPersons", "deletedIds", "confList", "apprList", "alumniList", "targets", "tracks", "users",
     "coursesByPerson", "talksByPerson", "researchByPerson", "idpByPerson", "tagsByPerson", "aspireByPerson",
-    "conf", "daily", "dailySavedDates"
+    "conf", "daily", "dailySavedDates", "calendarEvents"
   ];
 
   const PERSIST_KEYS = SESSION_KEYS.concat(SHARED_KEYS);
@@ -504,7 +602,7 @@ const Store = (() => {
   return { load, setState, get, onChange, reset, initRemote };
 })();
 
-// ==== js\viewmodel.js ====
+
 // Computes the full "vals" view-model for the current state. Screen renderers consume
 // this object read-only, and call the closures it hands back (e.g. vals.setQ(e)) to
 // mutate state.
@@ -543,6 +641,51 @@ const VM = (() => {
   function getUsers(state) {
     if (state.users) return state.users;
     return DEFAULT_USERS.map(u => ({ id: u[0], name: u[1], role: u[2], password: u[3], status: u[4], last: u[5] }));
+  }
+
+  function importRosterFromExcel() {
+    if (typeof XLSX === "undefined") { alert("ไม่พบไลบรารีอ่านไฟล์ Excel กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต"); return; }
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = ".xlsx,.xls,.csv";
+    inp.onchange = () => {
+      const fl = inp.files && inp.files[0];
+      if (!fl) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const wb = XLSX.read(e.target.result, { type: "array" });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        const pick = (row, keys) => { for (const k of keys) { if (row[k] !== undefined && String(row[k]).trim() !== "") return String(row[k]).trim(); } return ""; };
+        const added = rows.map(row => {
+          const name = pick(row, ["ชื่อ – สกุล", "ชื่อ-สกุล", "ชื่อ", "name", "Name"]);
+          if (!name) return null;
+          const pos = pick(row, ["ตำแหน่ง / ระดับ", "ตำแหน่ง", "pos", "Position"]) || POSITION_OPTIONS[0];
+          const sub = pick(row, ["หน่วยงาน / สาขาย่อย", "หน่วยงาน", "สาขาย่อย", "sub", "Unit"]) || "-";
+          let start = pick(row, ["วันเริ่มปฏิบัติงาน", "วันที่เริ่ม", "start", "Start"]);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) start = "2026-09-01";
+          const emp = pick(row, ["ประเภทการจ้าง", "emp", "Employment"]) || EMP_OPTIONS[0];
+          return [name, pos, 0, sub, start, emp];
+        }).filter(Boolean);
+        if (!added.length) { alert("ไม่พบข้อมูลที่นำเข้าได้ กรุณาตรวจสอบว่าไฟล์มีคอลัมน์ชื่อ-สกุล"); return; }
+        const cur = Store.get();
+        Model.invalidate();
+        Store.setState({ newPersons: (cur.newPersons || []).concat(added), admSaved: `นำเข้าบุคลากร ${added.length} รายการจากไฟล์ Excel เรียบร้อย` });
+      };
+      reader.readAsArrayBuffer(fl);
+    };
+    inp.click();
+  }
+
+  function exportLeaveReportExcel(reportRows, reportMonth) {
+    if (typeof XLSX === "undefined") { alert("ไม่พบไลบรารีส่งออกไฟล์ Excel กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต"); return; }
+    const data = reportRows.map(r => ({
+      "ชื่อ – สกุล": r.name, "หน่วยงาน": r.unit, "ลาพักผ่อน": r.vacation, "ลาป่วย": r.sick, "ลากิจ": r.personal, "มาสาย": r.late, "ไปประชุมนอกสถานที่": r.trip
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "รายงานวันลา");
+    XLSX.writeFile(wb, "รายงานวันลารายเดือน-" + reportMonth + ".xlsx");
   }
 
   function tagState(state, personId) {
@@ -627,7 +770,8 @@ const VM = (() => {
       Store.setState({ newPersons: (s.newPersons || []).concat([row]), modal: null, form: {}, admSaved: "เพิ่มบุคลากรใหม่เรียบร้อย" });
     } else if (s.modal === "conf" || (s.modal || "").indexOf("conf:") === 0) {
       const list = getConfs(s).slice();
-      const item = { title: f.title || "(ไม่ระบุชื่องานประชุม)", org: f.org || "-", date: f.date || "-", place: f.place || "-", fee: f.fee || "ไม่มีค่าลงทะเบียน", cpe: parseInt(f.cpe, 10) || 0, seats: parseInt(f.seats, 10) || 1, budget: f.budget || "งบพัฒนาบุคลากร", pub: true };
+      const dateLabel = (f.dateStart || "") + (f.dateEnd && f.dateEnd !== f.dateStart ? "–" + f.dateEnd : "");
+      const item = { title: f.title || "(ไม่ระบุชื่องานประชุม)", org: f.org || "-", date: dateLabel || "-", dateStart: f.dateStart || "", dateEnd: f.dateEnd || "", place: f.place || "-", fee: f.fee || "ไม่มีค่าลงทะเบียน", cpe: parseInt(f.cpe, 10) || 0, seats: parseInt(f.seats, 10) || 1, budget: f.budget || "งบพัฒนาบุคลากร", doc: f.doc || "", pub: true };
       if (s.modal === "conf") list.unshift(item); else list[parseInt(s.modal.slice(5), 10)] = item;
       Store.setState({ confList: list, modal: null, form: {}, admSaved: s.modal === "conf" ? "เพิ่มและเผยแพร่งานประชุมเรียบร้อย" : "แก้ไขข้อมูลงานประชุมเรียบร้อย" });
     } else if (s.modal === "user" || (s.modal || "").indexOf("user:") === 0) {
@@ -697,6 +841,13 @@ const VM = (() => {
         if (users[i].personName === person.name && users[i].status === "ใช้งานอยู่") { users[i] = Object.assign({}, users[i], { status: "ระงับการใช้งาน" }); usersChanged = true; }
       }
       Store.setState({ deletedIds: (s.deletedIds || []).concat(person.id), users: usersChanged ? users : s.users, modal: null, form: {} });
+    } else if (s.modal === "cal_new" || (s.modal || "").indexOf("cal_edit:") === 0) {
+      const person = findPerson(f.personName);
+      if (!person) { Store.setState({ modal: null, form: {} }); return; }
+      const item = { date: f.date || "-", personId: person.id, type: f.type || CALENDAR_EVENT_TYPES[0][0], note: f.note || "" };
+      const list = (s.calendarEvents || []).slice();
+      if (s.modal === "cal_new") list.push(item); else list[parseInt(s.modal.slice(9), 10)] = item;
+      Store.setState({ calendarEvents: list, modal: null, form: {} });
     } else {
       Store.setState({ modal: null, form: {} });
     }
@@ -710,7 +861,7 @@ const VM = (() => {
     const me = linkedPerson || activePeople[0] || null;
     const meId = me ? me.id : null;
 
-    const allowed = { chief: ["dash", "people", "person", "attend", "idp"], staff: ["me"], sec: ["daily", "appr", "roster", "alumni", "leave_report"], admin: ["adm_people", "adm_conf", "adm_target", "adm_user"] }[S.role];
+    const allowed = { chief: ["dash", "people", "person", "attend", "idp"], staff: ["me"], sec: ["daily", "calendar", "appr", "roster", "alumni", "leave_report"], admin: ["adm_people", "adm_conf", "adm_target", "adm_user"] }[S.role];
     let page = allowed.indexOf(S.page) >= 0 ? S.page : allowed[0];
     const sel_ = people[S.sel];
     if (page === "person" && (!sel_ || sel_.deleted)) page = "people";
@@ -814,6 +965,7 @@ const VM = (() => {
     const confs = getConfs(state).filter(c => c.pub).map((c, i) => {
       const st = S.conf[i];
       return { title: c.title, org: c.org, date: c.date, place: c.place, fee: c.fee, cpe: c.cpe, open: !!st,
+        announcementUrl: c.doc || "",
         cardBg: st ? "background:#f7faf9;border-color:#b9dcd3" : "background:#fff",
         btn: st ? "border:1px solid #0e6b5b;background:#0e6b5b;color:#fff" : "border:1px solid #dde5e2;background:#fff;color:#0e6b5b",
         btnLabel: st ? "สนใจแล้ว ✓" : "แสดงความสนใจ",
@@ -879,6 +1031,45 @@ const VM = (() => {
         total: counts.vacation + counts.sick + counts.personal };
     });
 
+    // Secretary's activity calendar: month grid of who's on leave/meeting/speaking which day.
+    const MONTH_NAMES_TH = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+    const calMonth = /^\d{4}-\d{2}$/.test(S.calMonth || "") ? S.calMonth : "2026-08";
+    const calEvents = S.calendarEvents || [];
+    const evTypeColor = {}; CALENDAR_EVENT_TYPES.forEach(t => evTypeColor[t[0]] = t[1]);
+    let calDays = [];
+    {
+      const [cy, cm] = calMonth.split("-").map(n => parseInt(n, 10));
+      const firstDow = new Date(cy, cm - 1, 1).getDay();
+      const daysInMonth = new Date(cy, cm, 0).getDate();
+      for (let i = 0; i < firstDow; i++) calDays.push(null);
+      for (let d = 1; d <= daysInMonth; d++) {
+        const iso = calMonth + "-" + String(d).padStart(2, "0");
+        const dayEvents = [];
+        calEvents.forEach((e, idx) => {
+          if (e.date !== iso) return;
+          const person = people.find(p => p.id === e.personId);
+          dayEvents.push({
+            name: person ? person.name : "(ไม่พบชื่อ)", type: e.type, note: e.note,
+            color: evTypeColor[e.type] || "#5c6b67",
+            edit: () => openModal("cal_edit:" + idx, { personName: person ? person.name : "", date: e.date, type: e.type, note: e.note }),
+            remove: () => Store.setState({ calendarEvents: calEvents.filter((_, j) => j !== idx) })
+          });
+        });
+        calDays.push({ day: d, iso, isToday: iso === "2026-08-26", events: dayEvents, add: () => openModal("cal_new", { date: iso }) });
+      }
+    }
+    const calMonthLabel = MONTH_NAMES_TH[parseInt(calMonth.slice(5, 7), 10) - 1] + " " + (parseInt(calMonth.slice(0, 4), 10) + 543);
+    const calPrevMonth = () => {
+      let [cy, cm] = calMonth.split("-").map(n => parseInt(n, 10));
+      cm--; if (cm < 1) { cm = 12; cy--; }
+      Store.setState({ calMonth: cy + "-" + String(cm).padStart(2, "0") });
+    };
+    const calNextMonth = () => {
+      let [cy, cm] = calMonth.split("-").map(n => parseInt(n, 10));
+      cm++; if (cm > 12) { cm = 1; cy++; }
+      Store.setState({ calMonth: cy + "-" + String(cm).padStart(2, "0") });
+    };
+
     const mk = S.modal || "";
     const contextPersonId = S.__contextPersonId; // set by openTrain/openTalk/openRes callers below
     const mCfg = mk === "train" ? { title: "รายงานการประชุม / อบรม", sub: "ข้อมูลจะเก็บเข้าแฟ้มพัฒนาบุคลากร", cta: "บันทึกรายการ",
@@ -890,7 +1081,7 @@ const VM = (() => {
       : mk === "person" ? { title: "เพิ่มบุคลากรใหม่", sub: "ข้อมูลจะปรากฏทั้งทะเบียนรายชื่อและ Dashboard", cta: "เพิ่มบุคลากร",
         fields: [fld(state, "ชื่อ – สกุล (พร้อมคำนำหน้า)", "name", "เช่น ภญ.กานต์ติมา ศรีสุข"), sel(state, "ตำแหน่ง / ระดับ", "pos", POSITION_OPTIONS), sel(state, "Target Career Path", "track", tracks.map(t => t[0])), fld(state, "สาขาย่อย / หน่วยงานที่ปฏิบัติ", "sub", "เช่น Outpatient Services"), dateFld(state, "วันเริ่มปฏิบัติงาน", "start"), sel(state, "ประเภทการจ้าง", "emp", EMP_OPTIONS)] }
       : mk === "conf" || mk.indexOf("conf:") === 0 ? { title: mk === "conf" ? "เพิ่มงานประชุม / คอร์สอบรม" : "แก้ไขข้อมูลงานประชุม", sub: "บันทึกแล้วเผยแพร่ให้บุคลากรเห็นทันที", cta: "บันทึกและเผยแพร่",
-        fields: [fld(state, "ชื่องานประชุม / หลักสูตร", "title", ""), fld(state, "หน่วยงานผู้จัด", "org", ""), fld(state, "วันที่จัด", "date", "เช่น 14–16 ต.ค. 2569"), fld(state, "สถานที่", "place", ""), fld(state, "ค่าลงทะเบียน", "fee", "เช่น 4,500 บาท"), fld(state, "หน่วย CPE", "cpe", "เช่น 18"), fld(state, "จำนวนที่นั่งที่กลุ่มงานสนับสนุน", "seats", "เช่น 3"), sel(state, "แหล่งงบประมาณ", "budget", CONF_BUDGET_OPTIONS)] }
+        fields: [fld(state, "ชื่องานประชุม / หลักสูตร", "title", "")].concat(dateRange(state, "วันที่จัด", "dateStart", "dateEnd"), [fld(state, "หน่วยงานผู้จัด", "org", ""), fld(state, "สถานที่", "place", ""), fld(state, "ค่าลงทะเบียน", "fee", "เช่น 4,500 บาท"), fld(state, "หน่วย CPE", "cpe", "เช่น 18"), fld(state, "จำนวนที่นั่งที่กลุ่มงานสนับสนุน", "seats", "เช่น 3"), sel(state, "แหล่งงบประมาณ", "budget", CONF_BUDGET_OPTIONS), file(state, "แนบไฟล์ประกาศ / โครงการ (ให้บุคลากรโหลดอ่านได้)", "doc")]) }
       : mk === "user" || mk.indexOf("user:") === 0 ? { title: mk === "user" ? "เพิ่มบัญชีผู้ใช้งาน" : "แก้ไขสิทธิ์ผู้ใช้งาน", sub: "กำหนด Username, Password และบทบาทที่ควบคุมหน้าที่ผู้ใช้เข้าถึงได้", cta: "บันทึกสิทธิ์",
         fields: [fld(state, "Username (เลขประจำตัว)", "id", "เช่น 2140009"), fld(state, "ชื่อ – สกุล", "name", ""), fld(state, "Password", "password", "เช่น LS123456"), sel(state, "บทบาท", "role", ["หัวหน้ากลุ่มงาน", "บุคลากร", "เลขากลุ่มงาน", "ผู้ดูแลระบบ (Admin)"]), sel(state, "สถานะบัญชี", "status", ["ใช้งานอยู่", "ระงับการใช้งาน"])].concat(
           (state.form.role || "หัวหน้ากลุ่มงาน") === "บุคลากร"
@@ -909,6 +1100,8 @@ const VM = (() => {
         fields: [fld(state, "เป้าหมายหลัก", "goal", ""), fld(state, "แผนปฏิบัติ", "action", ""), fld(state, "ช่วงเวลา", "period", ""), fld(state, "ความก้าวหน้า (%)", "pct", "0-100")] }
       : mk === "alumni_new" ? { title: "บันทึกผู้ลาออก / โอนย้าย / เกษียณ", sub: "บันทึกแล้วจะย้ายบุคคลนี้ออกจากทะเบียนปัจจุบัน และระงับบัญชีผู้ใช้ (ถ้ามี) ให้อัตโนมัติ", cta: "บันทึก",
         fields: [personSel(state, "บุคลากร", "personName", activePeople), dateFld(state, "วันที่สิ้นสุดปฏิบัติงาน", "end"), sel(state, "เหตุผล", "reason", ALUMNI_REASONS.map(r => r[0]))] }
+      : mk === "cal_new" || mk.indexOf("cal_edit:") === 0 ? { title: mk === "cal_new" ? "เพิ่มรายการในปฏิทิน" : "แก้ไขรายการในปฏิทิน", sub: "บันทึกว่าใครไปวันไหน พร้อมหมายเหตุกิจกรรม", cta: "บันทึก",
+        fields: [personSel(state, "บุคลากร", "personName", activePeople), dateFld(state, "วันที่", "date"), sel(state, "ประเภท", "type", CALENDAR_EVENT_TYPES.map(t => t[0])), fld(state, "หมายเหตุ (ระบุกิจกรรม)", "note", "เช่น ประชุมวิชาการเภสัชกรรม รพ.ราชวิถี")] }
       : { title: "", sub: "", cta: "บันทึก", fields: [] };
 
     const lr = LOGIN_ROLES.find(r => r[0] === S.loginRole) || LOGIN_ROLES[0];
@@ -963,12 +1156,13 @@ const VM = (() => {
     }));
     const admConfRows = getConfs(state).map((c, i) => ({
       title: c.title, org: c.org, date: c.date, place: c.place, fee: c.fee, cpe: c.cpe, seats: c.seats, budget: c.budget,
+      doc: c.doc || "", hasDoc: !!c.doc,
       pubLabel: c.pub ? "เผยแพร่แล้ว" : "บันทึกร่าง",
       pubChip: c.pub ? "background:#e3f1ee;color:#0a4f43" : "background:#f2f5f4;color:#5c6b67",
       toggle: () => { const l = getConfs(state).slice(); l[i] = Object.assign({}, l[i], { pub: !l[i].pub }); setConfs(l); },
       toggleLabel: c.pub ? "ยกเลิกเผยแพร่" : "เผยแพร่",
       remove: () => setConfs(getConfs(state).filter((_, j) => j !== i)),
-      edit: () => openModal("conf:" + i, { title: c.title, org: c.org, date: c.date, place: c.place, fee: c.fee, cpe: String(c.cpe), seats: String(c.seats), budget: c.budget })
+      edit: () => openModal("conf:" + i, { title: c.title, org: c.org, dateStart: c.dateStart || "", dateEnd: c.dateEnd || "", place: c.place, fee: c.fee, cpe: String(c.cpe), seats: String(c.seats), budget: c.budget, doc: c.doc || "" })
     }));
     const targetFields = [
       ["hours", "ชั่วโมงพัฒนาตนเอง / คน / ปี", "ชม.", "ใช้คำนวณ Dashboard, KPI และรายงาน 'ต้องติดตาม'"],
@@ -1007,6 +1201,7 @@ const VM = (() => {
       openAddTrack: () => openModal("track"),
       admSaved: S.admSaved, admSavedOn: !!S.admSaved, clearAdmSaved: () => Store.setState({ admSaved: "" }),
       openAddPerson: () => openModal("person"), openAddConf: () => openModal("conf"), openAddUser: () => openModal("user"),
+      importRoster: importRosterFromExcel,
       resetTargets: () => { Model.invalidate(); Store.setState({ targets: null, admSaved: "คืนค่าเป้าหมายเป็นค่าเริ่มต้นของกลุ่มงานแล้ว" }); },
       saveTargets: () => Store.setState({ admSaved: "บันทึกเป้าหมายและ KPI เรียบร้อย · มีผลกับทุกหน้าทันที" }),
       tHours: TG.hours, tCpe: TG.cpe, tLate: TG.late,
@@ -1030,6 +1225,7 @@ const VM = (() => {
       pageTitle: Ttl[0], pageSub: Ttl[1],
       isDash: page === "dash", isPeople: page === "people", isPerson: page === "person", isAttend: page === "attend", isIdp: page === "idp",
       isMe: page === "me", isDaily: page === "daily", isAppr: page === "appr", isRoster: page === "roster", isAlumni: page === "alumni", isLeaveReport: page === "leave_report",
+      isCalendar: page === "calendar",
       goAttend: () => go("attend"), goPeople: () => go("people"), goPerson: id => go("person", { sel: id }),
       watchList, avgHours, avgHoursPct, cpePassCount, idpDonePct, pendingApprCount,
       q: S.q, setQ: e => Store.setState({ q: e.target.value }), track: S.track, setTrack: e => Store.setState({ track: e.target.value }),
@@ -1051,6 +1247,7 @@ const VM = (() => {
       aspireYear: me ? aspireState(state, me).year : "ภายใน 2 ปี", setAspireYear: e => me && setAspire(state, me.id, { year: e.target.value }),
       aspireNote: me ? aspireState(state, me).note : "", setAspireNote: e => me && setAspire(state, me.id, { note: e.target.value }),
       saveAspire: () => Store.setState({ savedMsg: "บันทึกแล้ว · ส่งให้หัวหน้ากลุ่มงานทบทวนแผน IDP ถัดไป" }), savedMsg: S.savedMsg,
+      calDays, calMonthLabel, calPrevMonth, calNextMonth, calEventTypes: CALENDAR_EVENT_TYPES,
       dailyRows, dailySummary, dailyDate: S.dailyDate, setDailyDate: e => Store.setState({ dailyDate: e.target.value }),
       dailyDateTh: Model.thDate(S.dailyDate), dailySaved: !!(S.dailySavedDates || {})[S.dailyDate],
       markAllWork: () => { const d = {}; activePeople.forEach(p => d[p.id] = "work"); Store.setState({ daily: Object.assign({}, S.daily, { [S.dailyDate]: d }), dailySavedDates: Object.assign({}, S.dailySavedDates, { [S.dailyDate]: false }) }); },
@@ -1058,6 +1255,7 @@ const VM = (() => {
       apprRows, apprStats, openAddAppr: () => openModal("appr_new"),
       rosterRows, alumniRows, alumniCount: getAlumni(state).length,
       reportMonth, setReportMonth: e => Store.setState({ reportMonth: e.target.value }), reportRows,
+      exportLeaveReport: () => exportLeaveReportExcel(reportRows, reportMonth),
       openAddAlumni: () => openModal("alumni_new"),
       modalOpen: !!S.modal, modalTitle: mCfg.title, modalSub: mCfg.sub, modalCta: mCfg.cta, modalFields: mCfg.fields,
       closeModal: () => Store.setState({ modal: null, form: {} }), modalSave: () => saveModal(state)
@@ -1067,7 +1265,7 @@ const VM = (() => {
   return { compute };
 })();
 
-// ==== js\dom.js ====
+
 // Minimal hyperscript + patching DOM layer.
 //
 // h() builds plain vnode objects (not real DOM nodes). mount() diffs the new vnode
@@ -1203,7 +1401,7 @@ function mount(root, vnode) {
 function fmtInt(n) { return Number(n).toLocaleString("en-US"); }
 
 function card(extraStyle, ...children) {
-  return h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;padding:18px 20px;" + (extraStyle || "") }, ...children);
+  return h("div", { className: "card", style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;padding:18px 20px;" + (extraStyle || "") }, ...children);
 }
 
 function progressBar(pct, barStyle, height) {
@@ -1213,7 +1411,7 @@ function progressBar(pct, barStyle, height) {
   );
 }
 
-// ==== js\screens\login.js ====
+
 function renderLogin(vals) {
   return h("div", { style: "min-height:100vh;display:flex;align-items:stretch" },
     h("div", { style: "width:44%;flex:none;background:#0c2a25;color:#fff;padding:52px 54px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden" },
@@ -1317,7 +1515,7 @@ function renderForgotForm(vals) {
   );
 }
 
-// ==== js\screens\chief.js ====
+
 function renderDash(vals) {
   const barPairs = [
     [34, 9], [41, 12], [56, 14], [30, 8], [47, 11], [62, 18], [71, 16], [44, 10],
@@ -1335,7 +1533,7 @@ function renderDash(vals) {
   ];
 
   return h("div", {},
-    h("div", { style: "display:grid;grid-template-columns:repeat(5,1fr);gap:14px" },
+    h("div", { className: "grid-5" },
       card("", h("div", { style: "font-size:11.5px;color:#5c6b67" }, "บุคลากรทั้งหมด"),
         h("div", { style: "display:flex;align-items:baseline;gap:5px;margin-top:6px" }, h("span", { style: "font-size:27px;font-weight:600;letter-spacing:-.5px" }, vals.admTotal), h("span", { style: "font-size:12px;color:#5c6b67" }, "คน")),
         h("div", { style: "font-size:11px;color:#5c6b67;margin-top:5px" }, "ตามทะเบียนปัจจุบัน")),
@@ -1354,7 +1552,7 @@ function renderDash(vals) {
         h("div", { style: "font-size:11px;color:#8fb6ae;margin-top:5px" }, "คำขอไปประชุมที่รอบันทึกผล"))
     ),
 
-    h("div", { style: "display:grid;grid-template-columns:1.45fr 1fr;gap:14px;margin-top:14px" },
+    h("div", { className: "grid-dash-top", style: "margin-top:14px" },
       card("",
         h("div", { style: "display:flex;align-items:baseline;justify-content:space-between" },
           h("div", {}, h("div", { style: "font-size:14px;font-weight:600" }, "ชั่วโมงพัฒนาตนเองเฉลี่ยรายเดือน"), h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, "ชั่วโมง/คน · เป้าหมาย 3.3 ชม./เดือน")),
@@ -1392,7 +1590,7 @@ function renderDash(vals) {
       )
     ),
 
-    h("div", { style: "display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:14px" },
+    h("div", { className: "grid-3", style: "margin-top:14px" },
       card("",
         h("div", { style: "font-size:14px;font-weight:600" }, "ต้องติดตาม · ชม.อบรมต่ำกว่าเกณฑ์"),
         h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, "เหลือเวลา 2 เดือนก่อนปิดปีงบ"),
@@ -1423,7 +1621,7 @@ function renderDash(vals) {
           h("div", { style: "font-size:14px;font-weight:600" }, "สรุปขาด-ลา-มาสาย เดือน ส.ค."),
           h("button", { onClick: vals.goAttend, style: "border:0;background:transparent;color:#0e6b5b;font-size:12px;cursor:pointer;padding:0;font-weight:500" }, "ดูทั้งหมด")
         ),
-        h("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px" },
+        h("div", { className: "grid-2", style: "margin-top:14px;gap:9px" },
           h("div", { style: "background:#f4f7f6;border-radius:10px;padding:11px 12px" }, h("div", { style: "font-size:11px;color:#5c6b67" }, "มาปฏิบัติงาน"), h("div", { style: "font-size:19px;font-weight:600;margin-top:2px" }, "96.4%")),
           h("div", { style: "background:#fdf1e0;border-radius:10px;padding:11px 12px" }, h("div", { style: "font-size:11px;color:#8a5310" }, "มาสาย"), h("div", { style: "font-size:19px;font-weight:600;margin-top:2px;color:#8a5310" }, "11 ครั้ง")),
           h("div", { style: "background:#e6eef7;border-radius:10px;padding:11px 12px" }, h("div", { style: "font-size:11px;color:#2a5f8f" }, "ลาทุกประเภท"), h("div", { style: "font-size:19px;font-weight:600;margin-top:2px;color:#2a5f8f" }, "37 วัน")),
@@ -1441,7 +1639,7 @@ function renderDash(vals) {
 
 function renderPeople(vals) {
   return h("div", {},
-    h("div", { style: "display:flex;gap:10px;align-items:center;margin-bottom:14px" },
+    h("div", { className: "filter-row", style: "margin-bottom:14px" },
       h("input", { value: vals.q, onInput: vals.setQ, placeholder: "ค้นหาชื่อ ตำแหน่ง หรือความสนใจ", style: "flex:1;max-width:340px;padding:9px 13px;border:1px solid #dde5e2;border-radius:10px;background:#fff;outline:none" }),
       h("select", { value: vals.track, onChange: vals.setTrack, style: "padding:9px 12px;border:1px solid #dde5e2;border-radius:10px;background:#fff;outline:none;color:#14201d" },
         vals.trackOpts.map(t => h("option", { value: t }, t))
@@ -1450,6 +1648,7 @@ function renderPeople(vals) {
       h("div", { style: "font-size:12px;color:#5c6b67" }, `แสดง ${vals.shownCount} จาก ${vals.admTotal} คน`)
     ),
     h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;overflow:hidden" },
+      h("div", { className: "table-scroll" },
       h("table", { style: "width:100%;font-size:12.5px" },
         h("thead", {}, h("tr", { style: "background:#f7faf9;color:#5c6b67;font-size:11px;letter-spacing:.03em;text-align:left" },
           h("th", { style: "padding:11px 16px;font-weight:500" }, "ชื่อ – สกุล / ตำแหน่ง"),
@@ -1481,6 +1680,7 @@ function renderPeople(vals) {
           ))
         )
       )
+      )
     )
   );
 }
@@ -1490,7 +1690,7 @@ function renderPerson(vals) {
   const p = vals.p;
   return h("div", {},
     h("button", { onClick: vals.goPeople, style: "border:1px solid #dde5e2;background:#fff;padding:6px 12px;border-radius:9px;font-size:12px;cursor:pointer;color:#5c6b67;margin-bottom:14px" }, "← กลับรายชื่อบุคลากร"),
-    h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;padding:20px 22px;display:flex;gap:20px;align-items:flex-start" },
+    h("div", { className: "profile-header", style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;padding:20px 22px;display:flex;gap:20px;align-items:flex-start" },
       h("div", { style: "width:64px;height:64px;flex:none;border-radius:16px;font-size:20px;font-weight:600;display:flex;align-items:center;justify-content:center;color:#fff;" + p.avaBg }, p.ini),
       h("div", { style: "flex:1;min-width:0" },
         h("div", { style: "display:flex;align-items:center;gap:9px;flex-wrap:wrap" },
@@ -1508,7 +1708,7 @@ function renderPerson(vals) {
       )
     ),
 
-    h("div", { style: "display:grid;grid-template-columns:1.5fr 1fr;gap:14px;margin-top:14px;align-items:start" },
+    h("div", { className: "grid-profile", style: "margin-top:14px;align-items:start" },
       h("div", { style: "display:flex;flex-direction:column;gap:14px" },
         card("",
           h("div", { style: "font-size:14px;font-weight:600;margin-bottom:14px" }, "ความสนใจ · ความโดดเด่น · สิ่งที่ต้องการพัฒนา"),
@@ -1526,6 +1726,7 @@ function renderPerson(vals) {
             h("div", {}, h("div", { style: "font-size:14px;font-weight:600" }, "ประวัติการฝึกอบรม / ประชุมวิชาการ"), h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, p.courseCount + " รายการ ในปีงบประมาณ 2569")),
             h("div", { style: "font-size:11.5px;color:#5c6b67" }, "รวม " + p.hours + " ชม. · CPE " + p.cpe + " หน่วย")
           ),
+          h("div", { className: "table-scroll" },
           h("table", { style: "width:100%;font-size:12.5px" },
             h("thead", {}, h("tr", { style: "background:#f7faf9;color:#5c6b67;font-size:11px;text-align:left" },
               h("th", { style: "padding:9px 20px;font-weight:500;width:98px" }, "วันที่"), h("th", { style: "padding:9px 12px;font-weight:500" }, "หลักสูตร / การประชุม"),
@@ -1537,8 +1738,9 @@ function renderPerson(vals) {
               h("td", { style: "padding:10px 20px;text-align:right;font-weight:600" }, c.hours)
             )))
           )
+          )
         ),
-        h("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:14px" },
+        h("div", { className: "grid-2" },
           card("", h("div", { style: "font-size:14px;font-weight:600" }, "ประวัติการเป็นวิทยากร"),
             h("div", { style: "margin-top:12px;display:flex;flex-direction:column;gap:11px" },
               p.talks.map(t => h("div", { style: "padding-bottom:11px;border-bottom:1px solid #eef2f1" }, h("div", { style: "font-size:12.5px;font-weight:500;line-height:1.5" }, t.topic), h("div", { style: "font-size:11px;color:#5c6b67;margin-top:3px" }, t.venue + " · " + t.date))),
@@ -1553,10 +1755,10 @@ function renderPerson(vals) {
       ),
 
       h("div", { style: "display:flex;flex-direction:column;gap:14px" },
-        h("div", { style: "background:#0c2a25;border-radius:14px;padding:18px 20px;color:#fff" },
+        h("div", { className: "kpi-dark", style: "background:#0c2a25;border-radius:14px;padding:18px 20px;color:#fff" },
           h("div", { style: "font-size:14px;font-weight:600" }, "KPI การเรียนรู้และพัฒนา"),
           h("div", { style: "font-size:11.5px;color:#8fb6ae;margin-top:2px" }, "ปีงบประมาณ 2569"),
-          h("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:15px" },
+          h("div", { className: "grid-2", style: "margin-top:15px;gap:11px" },
             kpiTile("ชม.อบรม / เป้า " + vals.tHours, p.hours), kpiTile("CPE / เป้า " + vals.tCpe, p.cpe),
             kpiTile("เป็นวิทยากร", p.talkCount + " เรื่อง"), kpiTile("ผลงานวิจัย", p.resCount + " เรื่อง")
           ),
@@ -1630,7 +1832,7 @@ function renderAttend(vals) {
     h("div", { style: "display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px" },
       vals.monthTabs.map(m => h("button", { onClick: m.go, style: "padding:7px 13px;border-radius:9px;font-size:12.5px;cursor:pointer;border:1px solid #dde5e2;" + m.on }, m.label))
     ),
-    h("div", { style: "display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:14px" },
+    h("div", { className: "grid-6", style: "margin-bottom:14px" },
       vals.attendCards.map(c => h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:12px;padding:13px 15px" },
         h("div", { style: "font-size:11px;color:#5c6b67" }, c.label), h("div", { style: "font-size:21px;font-weight:600;margin-top:3px;" + c.color }, c.value), h("div", { style: "font-size:10.5px;color:#8a968f;margin-top:2px" }, c.note)
       ))
@@ -1641,6 +1843,7 @@ function renderAttend(vals) {
         h("button", { style: "border:1px solid #dde5e2;background:#fff;padding:7px 13px;border-radius:9px;font-size:12px;cursor:pointer;color:#3d4b47" }, "ส่งออก Excel")
       ),
       h("div", { style: "max-height:520px;overflow:auto" },
+        h("div", { className: "table-scroll" },
         h("table", { style: "width:100%;font-size:12.5px" },
           h("thead", {}, h("tr", { style: "background:#f7faf9;color:#5c6b67;font-size:11px;text-align:left;position:sticky;top:0" },
             h("th", { style: "padding:10px 20px;font-weight:500" }, "ชื่อ – สกุล"),
@@ -1660,6 +1863,7 @@ function renderAttend(vals) {
             h("td", { style: "padding:9px 20px;text-align:center;" + r.absStyle }, r.absent)
           )))
         )
+        )
       )
     )
   );
@@ -1672,7 +1876,7 @@ function renderIdp(vals) {
       h("div", { style: "flex:1" }),
       h("button", { onClick: vals.openAddIdp, style: "border:0;background:#0e6b5b;color:#fff;padding:9px 15px;border-radius:10px;font-size:12.5px;font-weight:500;cursor:pointer" }, "สร้างแผน IDP รอบใหม่")
     ),
-    h("div", { style: "display:grid;grid-template-columns:repeat(2,1fr);gap:14px" },
+    h("div", { className: "grid-2" },
       vals.idpCards.map(c => card("",
         h("div", { style: "display:flex;align-items:center;gap:10px" },
           h("div", { style: "width:32px;height:32px;flex:none;border-radius:50%;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;color:#fff;" + c.avaBg }, c.ini),
@@ -1697,7 +1901,7 @@ function renderIdp(vals) {
   );
 }
 
-// ==== js\screens\staff.js ====
+
 function renderMe(vals) {
   const me = vals.me;
   if (!me) {
@@ -1735,7 +1939,7 @@ function renderMe(vals) {
 
 function renderMeOverview(vals) {
   const me = vals.me;
-  return h("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start" },
+  return h("div", { className: "grid-2", style: "align-items:start" },
     card("",
       h("div", { style: "font-size:14px;font-weight:600" }, "Career Path ของฉัน"),
       h("div", { style: "margin-top:10px;padding:12px 14px;border-radius:11px;background:#f7faf9;border:1px solid #e7edeb" },
@@ -1747,7 +1951,7 @@ function renderMeOverview(vals) {
     h("div", { style: "display:flex;flex-direction:column;gap:14px" },
       h("div", { style: "background:#0c2a25;border-radius:14px;padding:18px 20px;color:#fff" },
         h("div", { style: "font-size:14px;font-weight:600" }, "KPI การเรียนรู้ของฉัน"),
-        h("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:14px" },
+        h("div", { className: "grid-2", style: "margin-top:14px;gap:11px" },
           kpiTile("ชม.อบรม / " + vals.tHours, me.hours), kpiTile("CPE / " + vals.tCpe, me.cpe),
           kpiTile("วิทยากร", me.talkCount + " เรื่อง"), kpiTile("งานวิจัย", me.resCount + " เรื่อง")
         )
@@ -1767,6 +1971,7 @@ function renderMeTrain(vals) {
       h("button", { onClick: vals.openTrain, style: "border:0;background:#0e6b5b;color:#fff;padding:9px 15px;border-radius:10px;font-size:12.5px;font-weight:500;cursor:pointer" }, "+ รายงานการประชุม / อบรม")
     ),
     h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;overflow:hidden" },
+      h("div", { className: "table-scroll" },
       h("table", { style: "width:100%;font-size:12.5px" },
         h("thead", {}, h("tr", { style: "background:#f7faf9;color:#5c6b67;font-size:11px;text-align:left" },
           h("th", { style: "padding:10px 20px;font-weight:500;width:130px" }, "วันที่"), h("th", { style: "padding:10px 12px;font-weight:500" }, "หลักสูตร / การประชุม"),
@@ -1780,12 +1985,13 @@ function renderMeTrain(vals) {
           h("td", { style: "padding:10px 20px;text-align:right" }, h("button", { onClick: () => vals.removeCourse(c.idx), style: "border:1px solid #f1cdc8;background:#fff;padding:4px 10px;border-radius:8px;font-size:11px;cursor:pointer;color:#8f231b" }, "ลบ"))
         )))
       )
+      )
     )
   );
 }
 
 function renderMeWork(vals) {
-  return h("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start" },
+  return h("div", { className: "grid-2", style: "align-items:start" },
     card("",
       h("div", { style: "display:flex;align-items:baseline;justify-content:space-between" }, h("div", { style: "font-size:14px;font-weight:600" }, "ประวัติเป็นวิทยากร"), h("button", { onClick: vals.openTalk, style: "border:1px solid #dde5e2;background:#fff;padding:6px 12px;border-radius:9px;font-size:12px;cursor:pointer;color:#0e6b5b;font-weight:500" }, "+ เพิ่ม")),
       h("div", { style: "margin-top:13px;display:flex;flex-direction:column;gap:11px" },
@@ -1810,7 +2016,7 @@ function renderMeWork(vals) {
 }
 
 function renderMeInterest(vals) {
-  return h("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start" },
+  return h("div", { className: "grid-2", style: "align-items:start" },
     h("div", { style: "display:flex;flex-direction:column;gap:14px" },
       card("",
         h("div", { style: "font-size:14px;font-weight:600" }, "ความสนใจ · ความสามารถพิเศษ · สิ่งที่ต้องการพัฒนา"),
@@ -1836,7 +2042,7 @@ function renderMeInterest(vals) {
           h("div", {}, h("div", { style: "font-size:11px;color:#5c6b67;margin-bottom:6px" }, "Target Career Path"),
             h("select", { value: vals.aspireTrack, onChange: vals.setAspireTrack, style: "width:100%;padding:9px 12px;border:1px solid #dde5e2;border-radius:9px;background:#fff;outline:none" },
               vals.trackNames.map(t => h("option", { value: t }, t)))),
-          h("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:11px" },
+          h("div", { className: "grid-2", style: "gap:11px" },
             h("div", {}, h("div", { style: "font-size:11px;color:#5c6b67;margin-bottom:6px" }, "สาขาย่อยที่สนใจ"), h("input", { value: vals.aspireSub, onInput: vals.setAspireSub, style: "width:100%;padding:9px 12px;border:1px solid #dde5e2;border-radius:9px;outline:none" })),
             h("div", {}, h("div", { style: "font-size:11px;color:#5c6b67;margin-bottom:6px" }, "กรอบเวลาที่ตั้งไว้"),
               h("select", { value: vals.aspireYear, onChange: vals.setAspireYear, style: "width:100%;padding:9px 12px;border:1px solid #dde5e2;border-radius:9px;background:#fff;outline:none" },
@@ -1859,7 +2065,8 @@ function renderMeInterest(vals) {
           h("div", { style: "display:flex;gap:10px;align-items:flex-start" },
             h("div", { style: "flex:1;min-width:0" },
               h("div", { style: "font-size:13px;font-weight:600;line-height:1.45" }, c.title), h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:4px" }, c.org),
-              h("div", { style: "display:flex;gap:12px;margin-top:7px;font-size:11.5px;color:#5c6b67;flex-wrap:wrap" }, h("span", {}, c.date), h("span", {}, c.place), h("span", {}, "ค่าลงทะเบียน " + c.fee), h("span", {}, c.cpe + " CPE"))
+              h("div", { style: "display:flex;gap:12px;margin-top:7px;font-size:11.5px;color:#5c6b67;flex-wrap:wrap" }, h("span", {}, c.date), h("span", {}, c.place), h("span", {}, "ค่าลงทะเบียน " + c.fee), h("span", {}, c.cpe + " CPE")),
+              c.announcementUrl ? h("div", { style: "margin-top:7px" }, h("a", { href: c.announcementUrl, target: "_blank", rel: "noopener", style: "font-size:11.5px;color:#0e6b5b;font-weight:500" }, "📎 เปิดไฟล์ประกาศ / โครงการ")) : null
             ),
             h("button", { onClick: c.toggle, style: "flex:none;padding:7px 13px;border-radius:9px;font-size:12px;font-weight:500;cursor:pointer;" + c.btn }, c.btnLabel)
           ),
@@ -1878,7 +2085,7 @@ function renderMeInterest(vals) {
 
 function renderMeLeave(vals) {
   const me = vals.me;
-  return h("div", { style: "display:grid;grid-template-columns:1fr 1.2fr;gap:14px;align-items:start" },
+  return h("div", { className: "grid-2b", style: "align-items:start" },
     h("div", { style: "display:flex;flex-direction:column;gap:14px" },
       card("",
         h("div", { style: "font-size:14px;font-weight:600" }, "สิทธิวันลาคงเหลือ · ปีงบ 2569"),
@@ -1898,6 +2105,7 @@ function renderMeLeave(vals) {
     ),
     h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;overflow:hidden" },
       h("div", { style: "padding:16px 20px 12px;font-size:14px;font-weight:600" }, "ประวัติการลาและมาสายของฉัน"),
+      h("div", { className: "table-scroll" },
       h("table", { style: "width:100%;font-size:12.5px" },
         h("thead", {}, h("tr", { style: "background:#f7faf9;color:#5c6b67;font-size:11px;text-align:left" },
           h("th", { style: "padding:9px 20px;font-weight:500" }, "วันที่"), h("th", { style: "padding:9px 12px;font-weight:500" }, "ประเภท"), h("th", { style: "padding:9px 12px;font-weight:500" }, "รายละเอียด"), h("th", { style: "padding:9px 20px;font-weight:500" }, "สถานะ")
@@ -1907,11 +2115,12 @@ function renderMeLeave(vals) {
           h("td", { style: "padding:9px 12px;color:#3d4b47" }, l.note), h("td", { style: "padding:9px 20px;color:#5c6b67" }, l.status)
         )))
       )
+      )
     )
   );
 }
 
-// ==== js\screens\sec.js ====
+
 function renderDaily(vals) {
   return h("div", {},
     h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;padding:15px 20px;display:flex;align-items:center;gap:16px;margin-bottom:14px" },
@@ -1925,6 +2134,7 @@ function renderDaily(vals) {
     ),
     vals.dailySaved ? h("div", { style: "background:#e3f1ee;border:1px solid #b9dcd3;color:#0a4f43;border-radius:11px;padding:11px 16px;font-size:12.5px;margin-bottom:14px" }, "บันทึกเวลาปฏิบัติงานของวันที่ " + vals.dailyDateTh + " เรียบร้อย · ส่งเข้ารายงานของหัวหน้ากลุ่มงานแล้ว") : null,
     h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;overflow:hidden" },
+      h("div", { className: "table-scroll" },
       h("table", { style: "width:100%;font-size:12.5px" },
         h("thead", {}, h("tr", { style: "background:#f7faf9;color:#5c6b67;font-size:11px;text-align:left" },
           h("th", { style: "padding:10px 20px;font-weight:500" }, "ชื่อ – สกุล"), h("th", { style: "padding:10px 12px;font-weight:500" }, "หน่วยงาน"),
@@ -1936,13 +2146,45 @@ function renderDaily(vals) {
           h("td", { style: "padding:8px 20px" }, h("div", { style: "display:flex;gap:5px;flex-wrap:wrap" }, r.opts.map(o => h("button", { onClick: o.set, style: "padding:5px 10px;border-radius:8px;font-size:11.5px;cursor:pointer;white-space:nowrap;" + o.on }, o.label))))
         )))
       )
+      )
     )
   );
 }
 
+function renderCalendar(vals) {
+  const dowLabels = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
+  return h("div", {},
+    h("div", { className: "filter-row", style: "margin-bottom:14px" },
+      h("button", { onClick: vals.calPrevMonth, style: "border:1px solid #dde5e2;background:#fff;padding:8px 13px;border-radius:9px;font-size:13px;cursor:pointer;color:#3d4b47" }, "‹"),
+      h("div", { style: "font-size:14px;font-weight:600;min-width:140px;text-align:center" }, vals.calMonthLabel),
+      h("button", { onClick: vals.calNextMonth, style: "border:1px solid #dde5e2;background:#fff;padding:8px 13px;border-radius:9px;font-size:13px;cursor:pointer;color:#3d4b47" }, "›"),
+      h("div", { style: "flex:1" }),
+      h("div", { style: "display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:#5c6b67" },
+        vals.calEventTypes.map(t => h("span", { style: "display:flex;align-items:center;gap:5px" }, h("span", { style: `width:8px;height:8px;border-radius:2px;background:${t[1]}` }), t[0]))
+      )
+    ),
+    h("div", { className: "calendar-grid", style: "margin-bottom:6px;font-size:11px;color:#5c6b67;text-align:center;font-weight:500" },
+      dowLabels.map(d => h("div", {}, d))
+    ),
+    h("div", { className: "calendar-grid" },
+      vals.calDays.map(c => c === null
+        ? h("div", { style: "background:transparent" })
+        : h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:9px;padding:6px;min-height:86px;display:flex;flex-direction:column;gap:3px" + (c.isToday ? ";border-color:#0e6b5b;box-shadow:0 0 0 1px #0e6b5b inset" : "") },
+            h("div", { style: "display:flex;align-items:center;justify-content:space-between" },
+              h("span", { style: "font-size:11.5px;font-weight:600" }, c.day),
+              h("button", { onClick: c.add, style: "border:0;background:#f2f5f4;color:#0e6b5b;width:18px;height:18px;border-radius:6px;font-size:12px;cursor:pointer;line-height:1;padding:0" }, "+")
+            ),
+            h("div", { style: "display:flex;flex-direction:column;gap:2px;overflow:auto" },
+              c.events.map(e => h("div", { onClick: e.edit, style: `cursor:pointer;font-size:10px;line-height:1.4;padding:2px 5px;border-radius:5px;background:${e.color}18;color:${e.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis`, title: e.name + " · " + e.type + (e.note ? " · " + e.note : "") }, e.name + " · " + e.type))
+            )
+          )
+      ))
+    );
+}
+
 function renderAppr(vals) {
   return h("div", {},
-    h("div", { style: "display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px" },
+    h("div", { className: "grid-4", style: "margin-bottom:14px" },
       h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:12px;padding:14px 16px" }, h("div", { style: "font-size:11px;color:#5c6b67" }, "คำขอทั้งหมด"), h("div", { style: "font-size:22px;font-weight:600;margin-top:3px" }, vals.apprStats.total)),
       h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:12px;padding:14px 16px" }, h("div", { style: "font-size:11px;color:#5c6b67" }, "อนุมัติแล้ว"), h("div", { style: "font-size:22px;font-weight:600;margin-top:3px;color:#0e6b5b" }, vals.apprStats.ok)),
       h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:12px;padding:14px 16px" }, h("div", { style: "font-size:11px;color:#5c6b67" }, "ไม่อนุมัติ"), h("div", { style: "font-size:22px;font-weight:600;margin-top:3px;color:#b0332a" }, vals.apprStats.no)),
@@ -1953,6 +2195,7 @@ function renderAppr(vals) {
         h("div", {}, h("div", { style: "font-size:14px;font-weight:600" }, "ทะเบียนคำขอไปประชุม / อบรม"), h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, "เลขาบันทึกผลการอนุมัติตามหนังสือที่ได้รับกลับ")),
         h("button", { onClick: vals.openAddAppr, style: "border:0;background:#0e6b5b;color:#fff;padding:8px 15px;border-radius:9px;font-size:12.5px;font-weight:500;cursor:pointer" }, "+ เพิ่มคำขอ")
       ),
+      h("div", { className: "table-scroll" },
       h("table", { style: "width:100%;font-size:12.5px" },
         h("thead", {}, h("tr", { style: "background:#f7faf9;color:#5c6b67;font-size:11px;text-align:left" },
           h("th", { style: "padding:10px 20px;font-weight:500" }, "ผู้ขอ"), h("th", { style: "padding:10px 12px;font-weight:500" }, "การประชุม / อบรม"), h("th", { style: "padding:10px 12px;font-weight:500" }, "วันที่จัด"),
@@ -1970,18 +2213,21 @@ function renderAppr(vals) {
             h("button", { onClick: a.remove, style: "border:1px solid #f1cdc8;background:#fff;padding:5px 11px;border-radius:8px;font-size:11.5px;cursor:pointer;color:#8f231b" }, "ลบ")))
         )))
       )
+      )
     )
   );
 }
 
 function renderLeaveReport(vals) {
   return h("div", {},
-    h("div", { style: "display:flex;gap:10px;align-items:center;margin-bottom:14px" },
+    h("div", { className: "filter-row", style: "margin-bottom:14px" },
       h("div", {}, h("div", { style: "font-size:11px;color:#5c6b67;margin-bottom:5px" }, "เดือนที่ต้องการดูรายงาน"), h("input", { value: vals.reportMonth, onInput: vals.setReportMonth, type: "month", style: "padding:8px 12px;border:1px solid #dde5e2;border-radius:9px;outline:none" })),
       h("div", { style: "flex:1" }),
-      h("div", { style: "font-size:12px;color:#5c6b67" }, "สรุปจากข้อมูลที่บันทึกในหน้า 'บันทึกมาปฏิบัติงาน' เท่านั้น")
+      h("div", { style: "font-size:12px;color:#5c6b67" }, "สรุปจากข้อมูลที่บันทึกในหน้า 'บันทึกมาปฏิบัติงาน' เท่านั้น"),
+      h("button", { onClick: vals.exportLeaveReport, style: "border:1px solid #dde5e2;background:#fff;padding:8px 15px;border-radius:9px;font-size:12.5px;cursor:pointer;color:#3d4b47" }, "ส่งออก Excel")
     ),
     h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;overflow:hidden" },
+      h("div", { className: "table-scroll" },
       h("table", { style: "width:100%;font-size:12.5px" },
         h("thead", {}, h("tr", { style: "background:#f7faf9;color:#5c6b67;font-size:11px;text-align:left" },
           h("th", { style: "padding:10px 20px;font-weight:500" }, "ชื่อ – สกุล"), h("th", { style: "padding:10px 12px;font-weight:500" }, "หน่วยงาน"),
@@ -1996,19 +2242,21 @@ function renderLeaveReport(vals) {
           h("td", { style: "padding:9px 20px;text-align:center;color:#1d6fa5" }, r.trip || "–")
         )))
       )
+      )
     )
   );
 }
 
 function renderRoster(vals) {
   return h("div", {},
-    h("div", { style: "display:flex;gap:10px;align-items:center;margin-bottom:14px" },
+    h("div", { className: "filter-row", style: "margin-bottom:14px" },
       h("input", { value: vals.q, onInput: vals.setQ, placeholder: "ค้นหาชื่อ / ตำแหน่ง", style: "flex:1;max-width:320px;padding:9px 13px;border:1px solid #dde5e2;border-radius:10px;background:#fff;outline:none" }),
       h("div", { style: "flex:1" }),
       h("div", { style: "font-size:12px;color:#5c6b67" }, "บุคลากรอยู่ " + vals.rosterRows.length + " คน"),
       h("button", { onClick: vals.openAddPerson, style: "border:0;background:#0e6b5b;color:#fff;padding:9px 15px;border-radius:10px;font-size:12.5px;font-weight:500;cursor:pointer" }, "+ เพิ่มบุคลากรใหม่")
     ),
     h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;overflow:hidden" },
+      h("div", { className: "table-scroll" },
       h("table", { style: "width:100%;font-size:12.5px" },
         h("thead", {}, h("tr", { style: "background:#f7faf9;color:#5c6b67;font-size:11px;text-align:left" },
           h("th", { style: "padding:10px 20px;font-weight:500" }, "ลำดับ"), h("th", { style: "padding:10px 12px;font-weight:500" }, "ชื่อ – สกุล"), h("th", { style: "padding:10px 12px;font-weight:500" }, "ตำแหน่ง / ระดับ"),
@@ -2025,6 +2273,7 @@ function renderRoster(vals) {
           h("td", { style: "padding:9px 20px;white-space:nowrap" }, r.tenure)
         )))
       )
+      )
     )
   );
 }
@@ -2036,6 +2285,7 @@ function renderAlumni(vals) {
         h("div", {}, h("div", { style: "font-size:14px;font-weight:600" }, "ประวัติผู้ที่เคยปฏิบัติงานในกลุ่มงานเภสัชกรรม"), h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, "รวม " + vals.alumniCount + " คน · เก็บไว้เพื่ออ้างอิงและออกหนังสือรับรอง")),
         h("button", { onClick: vals.openAddAlumni, style: "border:1px solid #dde5e2;background:#fff;padding:7px 13px;border-radius:9px;font-size:12px;cursor:pointer;color:#3d4b47" }, "+ บันทึกผู้ลาออก")
       ),
+      h("div", { className: "table-scroll" },
       h("table", { style: "width:100%;font-size:12.5px" },
         h("thead", {}, h("tr", { style: "background:#f7faf9;color:#5c6b67;font-size:11px;text-align:left" },
           h("th", { style: "padding:10px 20px;font-weight:500" }, "ชื่อ – สกุล"), h("th", { style: "padding:10px 12px;font-weight:500" }, "ตำแหน่งสุดท้าย"), h("th", { style: "padding:10px 12px;font-weight:500" }, "หน่วยงานที่สังกัด"),
@@ -2047,11 +2297,12 @@ function renderAlumni(vals) {
           h("td", { style: "padding:9px 20px" }, h("span", { style: "padding:2px 9px;border-radius:20px;font-size:11px;" + a.chip }, a.reason))
         )))
       )
+      )
     )
   );
 }
 
-// ==== js\screens\admin.js ====
+
 function renderAdmBanner(vals) {
   if (!vals.admSavedOn) return null;
   return h("div", { style: "background:#e3f1ee;border:1px solid #b9dcd3;color:#0a4f43;border-radius:11px;padding:11px 16px;font-size:12.5px;margin-bottom:14px;display:flex;align-items:center;gap:12px" },
@@ -2062,14 +2313,15 @@ function renderAdmBanner(vals) {
 
 function renderAdmPeople(vals) {
   return h("div", {},
-    h("div", { style: "display:flex;gap:10px;align-items:center;margin-bottom:14px" },
+    h("div", { className: "filter-row", style: "margin-bottom:14px" },
       h("input", { value: vals.admQ, onInput: vals.setAdmQ, placeholder: "ค้นหาชื่อ ตำแหน่ง หรือหน่วยงาน", style: "flex:1;max-width:330px;padding:9px 13px;border:1px solid #dde5e2;border-radius:10px;background:#fff;outline:none" }),
       h("div", { style: "flex:1" }),
       h("div", { style: "font-size:12px;color:#5c6b67" }, `แสดง ${vals.admCount} จาก ${vals.admTotal} คน`),
-      h("button", { style: "border:1px solid #dde5e2;background:#fff;padding:9px 14px;border-radius:10px;font-size:12.5px;cursor:pointer;color:#3d4b47" }, "นำเข้าจากไฟล์ Excel"),
+      h("button", { onClick: vals.importRoster, style: "border:1px solid #dde5e2;background:#fff;padding:9px 14px;border-radius:10px;font-size:12.5px;cursor:pointer;color:#3d4b47" }, "นำเข้าจากไฟล์ Excel"),
       h("button", { onClick: vals.openAddPerson, style: "border:0;background:#0e6b5b;color:#fff;padding:9px 16px;border-radius:10px;font-size:12.5px;font-weight:500;cursor:pointer" }, "+ เพิ่มบุคลากร")
     ),
     h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;overflow:hidden" },
+      h("div", { className: "table-scroll" },
       h("table", { style: "width:100%;font-size:12.5px" },
         h("thead", {}, h("tr", { style: "background:#f7faf9;color:#5c6b67;font-size:11px;text-align:left" },
           h("th", { style: "padding:10px 20px;font-weight:500;width:52px" }, "ลำดับ"), h("th", { style: "padding:10px 12px;font-weight:500" }, "ชื่อ – สกุล"), h("th", { style: "padding:10px 12px;font-weight:500" }, "ตำแหน่ง / ระดับ"),
@@ -2091,23 +2343,24 @@ function renderAdmPeople(vals) {
             h("button", { onClick: r.remove, style: "border:1px solid #f1cdc8;background:#fff;padding:5px 11px;border-radius:8px;font-size:11.5px;cursor:pointer;color:#8f231b" }, "ลบ")))
         )))
       )
+      )
     )
   );
 }
 
 function renderAdmConf(vals) {
   return h("div", {},
-    h("div", { style: "display:flex;gap:10px;align-items:center;margin-bottom:14px" },
+    h("div", { className: "filter-row", style: "margin-bottom:14px" },
       h("div", { style: "font-size:12.5px;color:#5c6b67;flex:1" }, `เผยแพร่แล้ว ${vals.admConfPub} จาก ${vals.admConfTotal} รายการ · รายการที่เผยแพร่จะปรากฏบนหน้า "งานประชุมที่เปิดรับ" ของบุคลากร`),
       h("button", { onClick: vals.openAddConf, style: "border:0;background:#0e6b5b;color:#fff;padding:9px 16px;border-radius:10px;font-size:12.5px;font-weight:500;cursor:pointer" }, "+ เพิ่มงานประชุม / คอร์สอบรม")
     ),
-    h("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:14px" },
+    h("div", { className: "grid-2" },
       vals.admConfRows.map(c => card("",
         h("div", { style: "display:flex;gap:10px;align-items:flex-start" },
           h("div", { style: "flex:1;min-width:0" }, h("div", { style: "font-size:13.5px;font-weight:600;line-height:1.45" }, c.title), h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:4px" }, c.org)),
           h("span", { style: "flex:none;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;" + c.pubChip }, c.pubLabel)
         ),
-        h("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:13px;font-size:11.5px;color:#5c6b67" },
+        h("div", { className: "grid-2", style: "gap:9px;margin-top:13px;font-size:11.5px;color:#5c6b67" },
           h("div", {}, "วันที่จัด ", h("b", { style: "color:#14201d;font-weight:600" }, c.date)),
           h("div", {}, "สถานที่ ", h("b", { style: "color:#14201d;font-weight:600" }, c.place)),
           h("div", {}, "ค่าลงทะเบียน ", h("b", { style: "color:#14201d;font-weight:600" }, c.fee)),
@@ -2115,6 +2368,7 @@ function renderAdmConf(vals) {
           h("div", {}, "ที่นั่งที่สนับสนุน ", h("b", { style: "color:#14201d;font-weight:600" }, c.seats)),
           h("div", {}, "งบประมาณ ", h("b", { style: "color:#14201d;font-weight:600" }, c.budget))
         ),
+        c.hasDoc ? h("div", { style: "margin-top:10px" }, h("a", { href: c.doc, target: "_blank", rel: "noopener", style: "font-size:11.5px;color:#0e6b5b;font-weight:500" }, "📎 เปิดไฟล์ประกาศ / โครงการที่แนบไว้")) : null,
         h("div", { style: "display:flex;gap:7px;margin-top:14px;padding-top:13px;border-top:1px solid #eef2f1" },
           h("button", { onClick: c.edit, style: "border:1px solid #dde5e2;background:#fff;padding:7px 13px;border-radius:9px;font-size:12px;cursor:pointer;color:#0e6b5b;font-weight:500" }, "แก้ไขข้อมูล"),
           h("button", { onClick: c.toggle, style: "border:1px solid #dde5e2;background:#f7faf9;padding:7px 13px;border-radius:9px;font-size:12px;cursor:pointer;color:#3d4b47" }, c.toggleLabel),
@@ -2128,13 +2382,13 @@ function renderAdmConf(vals) {
 
 function renderAdmTarget(vals) {
   return h("div", {},
-    h("div", { style: "display:grid;grid-template-columns:1.3fr 1fr;gap:14px;align-items:start" },
+    h("div", { className: "grid-target", style: "align-items:start" },
       card("",
         h("div", { style: "display:flex;align-items:baseline;justify-content:space-between" },
           h("div", {}, h("div", { style: "font-size:14px;font-weight:600" }, "ค่าเป้าหมายของกลุ่มงาน · ปีงบประมาณ 2569"), h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, "แก้ไขแล้วมีผลทันทีกับ Dashboard, KPI รายบุคคล และหน้าวันลา")),
           h("button", { onClick: vals.resetTargets, style: "border:1px solid #dde5e2;background:#fff;padding:7px 13px;border-radius:9px;font-size:12px;cursor:pointer;color:#3d4b47" }, "คืนค่าเริ่มต้น")
         ),
-        h("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px" },
+        h("div", { className: "grid-2", style: "gap:12px;margin-top:16px" },
           vals.targetFields.map(t => h("div", { style: "border:1px solid #e7edeb;border-radius:12px;padding:13px 14px" },
             h("div", { style: "font-size:12.5px;font-weight:500;line-height:1.4" }, t.label),
             h("div", { style: "display:flex;align-items:center;gap:9px;margin-top:9px" },
@@ -2167,11 +2421,12 @@ function renderAdmTarget(vals) {
 
 function renderAdmUser(vals) {
   return h("div", {},
-    h("div", { style: "display:flex;gap:10px;align-items:center;margin-bottom:14px" },
+    h("div", { className: "filter-row", style: "margin-bottom:14px" },
       h("div", { style: "flex:1;font-size:12.5px;color:#5c6b67" }, `บัญชีทั้งหมด ${vals.admUserCount} บัญชี · บทบาทกำหนดหน้าที่ผู้ใช้เข้าถึงได้ทั้งที่หลักเข้าสู่ระบบ`),
       h("button", { onClick: vals.openAddUser, style: "border:0;background:#0e6b5b;color:#fff;padding:9px 16px;border-radius:10px;font-size:12.5px;font-weight:500;cursor:pointer" }, "+ เพิ่มบัญชีผู้ใช้")
     ),
     h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;overflow:hidden" },
+      h("div", { className: "table-scroll" },
       h("table", { style: "width:100%;font-size:12.5px" },
         h("thead", {}, h("tr", { style: "background:#f7faf9;color:#5c6b67;font-size:11px;text-align:left" },
           h("th", { style: "padding:10px 20px;font-weight:500" }, "ชื่อผู้ใช้"), h("th", { style: "padding:10px 12px;font-weight:500" }, "ชื่อ – สกุล"), h("th", { style: "padding:10px 12px;font-weight:500" }, "บทบาท"),
@@ -2189,15 +2444,16 @@ function renderAdmUser(vals) {
             h("button", { onClick: u.remove, style: "border:1px solid #f1cdc8;background:#fff;padding:5px 11px;border-radius:8px;font-size:11.5px;cursor:pointer;color:#8f231b" }, "ลบ")))
         )))
       )
+      )
     )
   );
 }
 
-// ==== js\screens\modal.js ====
+
 function renderModal(vals) {
   if (!vals.modalOpen) return null;
-  return h("div", { style: "position:fixed;inset:0;z-index:60;background:rgba(12,42,37,.45);display:flex;align-items:center;justify-content:center;padding:30px", onClick: e => { if (e.target === e.currentTarget) vals.closeModal(); } },
-    h("div", { style: "background:#fff;border-radius:16px;width:560px;max-width:100%;max-height:100%;overflow:auto;box-shadow:0 24px 60px rgba(6,35,29,.28)" },
+  return h("div", { className: "modal-overlay", style: "position:fixed;inset:0;z-index:60;background:rgba(12,42,37,.45);display:flex;align-items:center;justify-content:center;padding:30px", onClick: e => { if (e.target === e.currentTarget) vals.closeModal(); } },
+    h("div", { className: "modal-box", style: "background:#fff;border-radius:16px;box-shadow:0 24px 60px rgba(6,35,29,.28)" },
       h("div", { style: "padding:18px 22px;border-bottom:1px solid #eef2f1;display:flex;align-items:center;gap:12px" },
         h("div", { style: "flex:1" }, h("div", { style: "font-size:15px;font-weight:600" }, vals.modalTitle), h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, vals.modalSub)),
         h("button", { onClick: vals.closeModal, style: "border:0;background:#f2f5f4;width:30px;height:30px;border-radius:9px;cursor:pointer;color:#5c6b67;font-size:15px" }, "×")
@@ -2224,9 +2480,9 @@ function renderModal(vals) {
   );
 }
 
-// ==== js\render.js ====
+
 function renderSidebar(vals) {
-  return h("aside", { style: "width:254px;flex:none;background:#0c2a25;color:#cfe2dc;display:flex;flex-direction:column;position:sticky;top:0;height:100vh" },
+  return h("aside", { className: "app-sidebar" },
     h("div", { style: "padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.09)" },
       h("div", { style: "display:flex;align-items:center;gap:11px" },
         h("div", { style: "width:34px;height:34px;flex:none;border-radius:9px;background:#39c1a3;color:#06231d;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;letter-spacing:-.5px" }, "ภก"),
@@ -2290,11 +2546,11 @@ function renderApp() {
 
   const content = resolveScreen(vals);
 
-  const shell = h("div", { style: "display:flex;min-height:100vh;align-items:stretch" },
+  const shell = h("div", { className: "app-shell" },
     renderSidebar(vals),
-    h("main", { style: "flex:1;min-width:0;display:flex;flex-direction:column" },
+    h("main", { className: "app-main" },
       renderHeader(vals),
-      h("div", { style: "padding:24px 30px 70px;animation:fadeUp .25s ease both" }, content)
+      h("div", { className: "app-content" + (vals.isPerson ? " print-profile" : "") }, content)
     ),
     renderModal(vals)
   );
@@ -2309,6 +2565,7 @@ function resolveScreen(vals) {
   if (vals.isIdp) return renderIdp(vals);
   if (vals.isMe) return renderMe(vals);
   if (vals.isDaily) return h("div", {}, renderAdmBanner(vals), renderDaily(vals));
+  if (vals.isCalendar) return h("div", {}, renderAdmBanner(vals), renderCalendar(vals));
   if (vals.isAppr) return h("div", {}, renderAdmBanner(vals), renderAppr(vals));
   if (vals.isRoster) return h("div", {}, renderAdmBanner(vals), renderRoster(vals));
   if (vals.isAlumni) return h("div", {}, renderAdmBanner(vals), renderAlumni(vals));
@@ -2320,7 +2577,7 @@ function resolveScreen(vals) {
   return h("div", {}, "หน้านี้ยังไม่พร้อมใช้งาน");
 }
 
-// ==== js\main.js ====
+
 Store.onChange(renderApp);
 Store.load();
 renderApp();
