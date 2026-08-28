@@ -44,21 +44,174 @@ table{border-collapse:collapse}
 .modal-box{width:560px;max-width:100%;max-height:100%;overflow:auto}
 .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
 
+/* Grid/flex items default to min-width:auto, so one wide child (a table with a
+   min-width, a long unbroken string) forces its whole track wider than the
+   container and pushes the page sideways. Let every track shrink instead, and
+   let the scroll wrappers do the scrolling. */
+.grid-5 > *,.grid-4 > *,.grid-6 > *,.grid-3 > *,.grid-2 > *,.grid-2b > *,
+.grid-dash-top > *,.grid-profile > *,.grid-target > *{min-width:0}
+.table-scroll,.calendar-scroll,.chart-scroll{min-width:0}
+.chart-scroll{overflow-x:auto}
+
+.calendar-scroll{overflow-x:auto}
+
+/* =========================================================================
+   MOBILE  (<= 860px)
+   The screens are built from inline styles, so every override here needs a
+   matching class selector and, for anything competing with an inline rule,
+   !important. Goal: the phone reads like the desktop app, just stacked —
+   real tap targets, no 10px type, nothing clipped off the right edge.
+   ========================================================================= */
 @media (max-width: 860px){
+  html,body{overflow-x:hidden}
+
+  /* ---- Shell: sidebar becomes a compact sticky app bar ------------------ */
   .app-shell{flex-direction:column}
-  .app-sidebar{width:100%;height:auto;position:static;flex-direction:column}
-  .app-sidebar nav{max-height:none}
-  .app-content{padding:14px}
+  .app-sidebar{
+    width:100%;height:auto;position:sticky;top:0;z-index:40;
+    flex-direction:row;flex-wrap:wrap;align-items:center;
+    box-shadow:0 2px 12px rgba(6,35,29,.18)
+  }
+  .sidebar-brand{
+    order:1;flex:1 1 auto;min-width:0;
+    padding:9px 14px !important;border-bottom:0 !important
+  }
+  .brand-mark{width:30px !important;height:30px !important;font-size:13px !important;border-radius:8px !important}
+  .brand-name{font-size:14px !important}
+  .brand-sub{font-size:11.5px !important}
+  .brand-eyebrow{display:none}
+
+  .sidebar-user{
+    order:2;flex:0 0 auto;
+    padding:9px 14px !important;border-top:0 !important;gap:8px !important
+  }
+  .user-meta{display:none}          /* name/role already shown in the header */
+  .user-ava{width:30px !important;height:30px !important}
+
+  /* Nav: one horizontally-scrolling row of pills, groups flattened.
+     The element carries an inline `flex:1;overflow:auto`, so both need !important. */
+  .sidebar-nav{
+    order:3;flex:1 1 100% !important;
+    display:flex;flex-direction:row;gap:7px;
+    overflow-x:auto !important;overflow-y:hidden !important;
+    padding:0 12px 10px !important;
+    scrollbar-width:none;-webkit-overflow-scrolling:touch
+  }
+  .sidebar-nav::-webkit-scrollbar{display:none}
+  .nav-group{display:flex;gap:7px;margin-bottom:0 !important}
+  .nav-group-title{display:none}
+  .nav-btn{
+    width:auto !important;flex:none;white-space:nowrap;
+    padding:9px 15px !important;margin-bottom:0 !important;
+    border-radius:22px !important;font-size:13.5px !important
+  }
+  .nav-dot{display:none}
+  .nav-label{flex:none !important}
+  .nav-badge{
+    font-size:11px !important;background:rgba(255,255,255,.16);
+    border-radius:10px;padding:1px 7px;margin-left:2px
+  }
+
+  /* ---- Page header ------------------------------------------------------
+     Only the app bar stays pinned; the title bar scrolls away so a short phone
+     screen isn't half chrome. */
+  .app-header{position:static !important;padding:12px 14px !important;gap:10px !important;flex-wrap:wrap}
+  .app-header h1{font-size:17px !important}
+  .header-title{flex:1 1 100% !important}
+  .header-role{display:none !important}   /* duplicated by the app bar above */
+  .header-date{
+    border-left:0 !important;padding-left:0 !important;
+    text-align:left !important;flex:1 1 100%;
+    display:flex;gap:8px;font-size:11.5px !important
+  }
+  .app-content{padding:14px 12px 60px}
+
+  /* ---- Grids stack ----------------------------------------------------- */
   .grid-3,.grid-2,.grid-2b,.grid-dash-top,.grid-profile,.grid-target{grid-template-columns:1fr}
-  .grid-5,.grid-4,.grid-6{grid-template-columns:1fr 1fr;gap:9px}
-  .calendar-grid{grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;font-size:10px}
-  header{flex-wrap:wrap;padding:10px 14px !important;gap:10px !important}
-  header > div:last-child{display:none}
-  .filter-row{align-items:stretch}
+  .grid-5,.grid-4,.grid-6{grid-template-columns:1fr 1fr;gap:10px}
+
+  /* ---- Readable type: the inline sizes are tuned for a 1440px desktop --- */
+  .app-content [style*="font-size:10px"]{font-size:11.5px !important}
+  .app-content [style*="font-size:10.5px"]{font-size:12px !important}
+  .app-content [style*="font-size:11px"]{font-size:12px !important}
+  .app-content [style*="font-size:11.5px"]{font-size:12.5px !important}
+  .app-content [style*="font-size:12px"]{font-size:13px !important}
+  .app-content [style*="font-size:12.5px"]{font-size:13.5px !important}
+  .app-content [style*="font-size:13px"]{font-size:14px !important}
+  .app-content [style*="font-size:13.5px"]{font-size:14.5px !important}
+  .app-content [style*="font-size:27px"]{font-size:24px !important}
+
+  /* Cards: less padding, more room for content */
+  .app-content .card{padding:14px 15px !important}
+
+  /* Tap targets */
+  .app-content button{min-height:38px}
+  .app-content input,.app-content select,.app-content textarea{font-size:16px !important} /* stops iOS zoom-on-focus */
+
+  /* ---- Tables scroll instead of squashing ------------------------------ */
+  .table-scroll{-webkit-overflow-scrolling:touch}
+  .table-scroll table{min-width:620px}
+  .table-scroll th,.table-scroll td{white-space:nowrap}
+
+  /* ---- Filter / toolbar rows ------------------------------------------- */
+  .filter-row{align-items:stretch;gap:9px}
   .filter-row > *{width:100%}
   .filter-row > select,.filter-row > input{max-width:none !important}
-  .modal-overlay{padding:0 !important}
-  .modal-box{width:100%;height:100%;max-height:100%;border-radius:0 !important}
+  .filter-row > div[style*="flex:1"]:empty{display:none}
+
+  /* ---- Toolbars & profile headers that are flex rows on desktop -------- */
+  .daily-toolbar{flex-wrap:wrap;gap:12px !important;padding:14px 15px !important}
+  .daily-datefield{flex:1 1 100%}
+  .daily-datefield input{width:100%}
+  .daily-summary{
+    flex:1 1 100%;flex-wrap:wrap;
+    padding-left:0 !important;border-left:0 !important;
+    padding-top:12px !important;border-top:1px solid #eef2f1
+  }
+  .daily-toolbar > button{flex:1 1 100%}
+
+  .me-header,.profile-header{flex-wrap:wrap;gap:14px !important;padding:16px !important}
+  .me-header > div[style*="flex:1"],.profile-header > div[style*="flex:1"]{flex:1 1 100% !important}
+  .me-stats{flex:1 1 100% !important;flex-wrap:wrap}
+  .me-stats > div{flex:1 1 30%}
+  .profile-header > div:last-child{flex:1 1 100% !important;flex-direction:row !important}
+  .profile-header > div:last-child button{flex:1}
+
+  /* ---- Calendar: keep cells legible, scroll sideways ------------------- */
+  .calendar-scroll{-webkit-overflow-scrolling:touch;margin:0 -12px;padding:0 12px}
+  .calendar-grid{min-width:620px;gap:5px}
+  .chart-scroll{-webkit-overflow-scrolling:touch}
+  .chart-inner{min-width:430px}
+
+  /* ---- Modal becomes a full-screen sheet ------------------------------- */
+  .modal-overlay{padding:0 !important;align-items:stretch !important}
+  .modal-box{width:100% !important;max-width:none !important;height:100%;max-height:100% !important;border-radius:0 !important}
+
+  /* ---- Login screen: stack the hero above the form --------------------- */
+  .login-shell{flex-direction:column;min-height:100vh}
+  .login-hero{
+    width:100% !important;flex:none;
+    padding:22px 20px 20px !important;
+    justify-content:flex-start !important;gap:16px
+  }
+  .hero-blob{display:none}
+  .hero-copy{max-width:none !important}
+  .hero-eyebrow{margin-bottom:8px !important;font-size:10px !important}
+  .hero-heading{font-size:21px !important;line-height:1.3 !important}
+  .hero-heading br{display:none}
+  .hero-lede{display:none}
+  .hero-stats{
+    gap:0 !important;margin-top:16px !important;padding-top:14px !important;
+    display:grid !important;grid-template-columns:repeat(3,1fr);text-align:center
+  }
+  .hero-footer{display:none}
+  .login-form-side{padding:22px 18px 40px !important;align-items:flex-start !important}
+}
+
+/* Small phones */
+@media (max-width: 400px){
+  .grid-5,.grid-4,.grid-6{grid-template-columns:1fr}
+  .app-content{padding:12px 10px 60px}
 }
 
 @media print{
@@ -294,18 +447,18 @@ const CALENDAR_EVENT_TYPES = [
 ];
 
 const NAV = {
-  chief: [["ภาพรวม", [["dash", "Dashboard พัฒนาบุคลากร", ""], ["people", "ข้อมูลบุคลากร", "40"]]], ["การพัฒนาและวิจัย", [["idp", "แผน IDP รายบุคคล", "40"], ["attend", "ขาด ลา มาสาย", ""]]]],
+  chief: [["ภาพรวม", [["dash", "Dashboard พัฒนาบุคลากร", ""], ["people", "ข้อมูลบุคลากร", "{people}"]]], ["การพัฒนาและวิจัย", [["idp", "แผน IDP รายบุคคล", "{people}"], ["attend", "ขาด ลา มาสาย", ""]]]],
   staff: [["ของฉัน", [["me", "โปรไฟล์ของฉัน", ""]]]],
-  sec: [["งานประจำวัน", [["daily", "บันทึกมาปฏิบัติงาน", ""], ["calendar", "ปฏิทินกิจกรรม", ""], ["appr", "ผลอนุมัติไปประชุม", "4"], ["leave_report", "รายงานวันลารายเดือน", ""]]], ["ทะเบียนบุคลากร", [["roster", "รายชื่อบุคลากรปัจจุบัน", "40"], ["alumni", "ประวัติผู้เคยปฏิบัติงาน", "8"]]]],
+  sec: [["งานประจำวัน", [["daily", "บันทึกมาปฏิบัติงาน", ""], ["calendar", "ปฏิทินกิจกรรม", ""], ["appr", "ผลอนุมัติไปประชุม", "{appr}"], ["leave_report", "รายงานวันลารายเดือน", ""]]], ["ทะเบียนบุคลากร", [["roster", "รายชื่อบุคลากรปัจจุบัน", "{people}"], ["alumni", "ประวัติผู้เคยปฏิบัติงาน", "{alumni}"]]]],
   admin: [["จัดการข้อมูลหลัก", [["adm_people", "ทะเบียนบุคลากร", ""], ["adm_conf", "งานประชุม / คอร์สอบรม", ""]]], ["ตั้งค่าระบบ", [["adm_target", "เป้าหมายและ KPI", ""], ["adm_user", "สิทธิ์ผู้ใช้งาน", ""]]]]
 };
 
 const TITLES = {
-  dash: ["Dashboard ภาพรวมการพัฒนาบุคลากร", "กลุ่มงานเภสัชกรรม โรงพยาบาลเลิดสิน · ปีงบประมาณ 2569"],
+  dash: ["Dashboard ภาพรวมการพัฒนาบุคลากร", "กลุ่มงานเภสัชกรรม โรงพยาบาลเลิดสิน · ปีงบประมาณ {FY}"],
   people: ["ข้อมูลบุคลากร", "ความก้าวหน้าตาม Career Path และ KPI การเรียนรู้ของทุกคน"],
   person: ["Profile บุคลากร", "ความสนใจ ความโดดเด่น ประวัติการฝึกอบรม และความก้าวหน้าสู่ Career Path"],
   attend: ["ขาด ลา มาสาย รายเดือน", "สรุปการบันทึกเวลาปฏิบัติงานของเลขากลุ่มงาน"],
-  idp: ["แผนพัฒนารายบุคคล (IDP)", "รอบประเมิน 2/2569 · ติดตามความก้าวหน้าของทุกคน"],
+  idp: ["แผนพัฒนารายบุคคล (IDP)", "ปีงบประมาณ {FY} · ติดตามความก้าวหน้าของทุกคน"],
   me: ["โปรไฟล์ของฉัน", "รายงานการพัฒนาตนเอง ความสนใจ และสิทธิวันลา"],
   daily: ["บันทึกการมาปฏิบัติงานรายวัน", "เลขากลุ่มงาน · บันทึกสถานะรายบุคคลทุกวันทำการ"],
   calendar: ["ปฏิทินกิจกรรม", "บันทึกวันลา ประชุม และการเป็นวิทยากรของแต่ละคนในแต่ละวัน"],
@@ -365,10 +518,29 @@ const Model = (() => {
     return d.getDate() + " " + TH_M[d.getMonth()] + " " + (d.getFullYear() + 543);
   }
 
+  // --- Real "today" and Thai government fiscal year (1 Oct – 30 Sep) ---------
+  // FY 2569 runs 1 Oct 2025 – 30 Sep 2026, so any date from October onward
+  // already belongs to the next fiscal year.
+  const pad2 = n => String(n).padStart(2, "0");
+  function todayISO(d) { d = d || new Date(); return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); }
+  function todayMonthISO(d) { d = d || new Date(); return d.getFullYear() + "-" + pad2(d.getMonth() + 1); }
+  function thToday(d) { d = d || new Date(); return d.getDate() + " " + TH_M[d.getMonth()] + " " + (d.getFullYear() + 543); }
+  function fiscalYear(d) {
+    d = d || new Date();
+    return (d.getMonth() >= 9 ? d.getFullYear() + 1 : d.getFullYear()) + 543;
+  }
+  // Start/end of the fiscal year that contains `d`, as ISO dates.
+  function fiscalRange(d) {
+    d = d || new Date();
+    const endCe = d.getMonth() >= 9 ? d.getFullYear() + 1 : d.getFullYear();
+    return { start: (endCe - 1) + "-10-01", end: endCe + "-09-30" };
+  }
+
   function tenure(iso) {
-    const s = new Date(iso), e = new Date(2026, 7, 26);
+    const s = new Date(iso), e = new Date();
     let m = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
     if (e.getDate() < s.getDate()) m -= 1;
+    if (m < 0) m = 0;
     const y = Math.floor(m / 12), r = m % 12;
     return y + " ปี" + (r ? " " + r + " เดือน" : "");
   }
@@ -419,7 +591,7 @@ const Model = (() => {
       const [name, pos, ti, sub, start, emp] = r;
       const tr = tracks[ti] || tracks[0] || ["-", "-", "#5c6b67"];
       const si = stageIdx(pos);
-      const yr = 2026 - new Date(start).getFullYear();
+      const yr = new Date().getFullYear() - new Date(start).getFullYear();
 
       const courses = (coursesBy[i] || []).slice();
       const hours = courses.reduce((a, c) => a + (parseInt(c.hours, 10) || 0), 0);
@@ -483,7 +655,7 @@ const Model = (() => {
 
   function invalidate() { cacheN = -1; }
 
-  return { ini, stageIdx, stageName, positionGroup, sortPeople, hash, thDate, tenure, kpiOf, trackShortLabel, getTracks, countLeave, build, invalidate };
+  return { ini, stageIdx, stageName, positionGroup, sortPeople, hash, thDate, todayISO, todayMonthISO, thToday, fiscalYear, fiscalRange, tenure, kpiOf, trackShortLabel, getTracks, countLeave, build, invalidate };
 })();
 
 
@@ -499,12 +671,12 @@ const Store = (() => {
     currentUserId: null,
     newPersons: [], deletedIds: [], confList: null, apprList: [], alumniList: [], targets: null, tracks: null,
     admSaved: "", users: null, admQ: "",
-    role: "chief", page: "dash", tab: "overview", sel: 0, month: 7, reportMonth: "2026-08",
+    role: "chief", page: "dash", tab: "overview", sel: 0, month: new Date().getMonth(), reportMonth: Model.todayMonthISO(),
     q: "", track: "ทุก Career Path", idpFilter: "ทั้งหมด",
     coursesByPerson: {}, talksByPerson: {}, researchByPerson: {}, idpByPerson: {},
     tagsByPerson: {}, aspireByPerson: {}, savedMsg: "",
-    conf: {}, daily: {}, dailySavedDates: {}, dailyDate: "2026-08-26",
-    calendarEvents: [], calMonth: "2026-08",
+    conf: {}, daily: {}, dailySavedDates: {}, dailyDate: Model.todayISO(),
+    calendarEvents: [], calMonth: Model.todayMonthISO(),
     modal: null, form: {}, __contextPersonId: null
   });
 
@@ -512,8 +684,13 @@ const Store = (() => {
   // your own login session). Never pushed to or overwritten by other devices.
   const SESSION_KEYS = [
     "auth", "loginRole", "remember", "currentUserId",
-    "role", "page", "tab", "sel", "month", "reportMonth", "q", "track", "idpFilter", "admQ", "dailyDate", "calMonth"
+    "role", "page", "tab", "sel", "q", "track", "idpFilter", "admQ"
   ];
+
+  // Date-cursor fields (which day/month you're looking at) are deliberately NOT
+  // persisted: they must reopen on the real current date every session, or the
+  // secretary can silently record today's attendance onto a stale saved date.
+  const DATE_CURSOR_KEYS = ["month", "reportMonth", "dailyDate", "calMonth"];
 
   // The actual data: rosters, accounts, records — this is what should look the same
   // on every computer, so it's the part that syncs through RemoteSync.
@@ -537,6 +714,8 @@ const Store = (() => {
     if (saved && Array.isArray(saved.users) && saved.users.some(u => typeof u.password !== "string")) {
       saved.users = null;
     }
+    // Older builds persisted the date cursors; drop them so defaults() (= today) wins.
+    if (saved) DATE_CURSOR_KEYS.forEach(k => { delete saved[k]; });
     return saved;
   }
 
@@ -824,7 +1003,7 @@ const VM = (() => {
     } else if (s.modal === "alumni_new") {
       const person = findPerson(f.personName);
       if (!person) { Store.setState({ modal: null, form: {} }); return; }
-      const endIso = /^\d{4}-\d{2}-\d{2}$/.test(f.end || "") ? f.end : "2026-08-26";
+      const endIso = /^\d{4}-\d{2}-\d{2}$/.test(f.end || "") ? f.end : Model.todayISO();
       const sD = new Date(person.start), eD = new Date(endIso);
       let mo = (eD.getFullYear() - sD.getFullYear()) * 12 + (eD.getMonth() - sD.getMonth());
       if (eD.getDate() < sD.getDate()) mo -= 1;
@@ -865,13 +1044,23 @@ const VM = (() => {
     let page = allowed.indexOf(S.page) >= 0 ? S.page : allowed[0];
     const sel_ = people[S.sel];
     if (page === "person" && (!sel_ || sel_.deleted)) page = "people";
-    const Ttl = TITLES[page] || ["", ""];
 
-    const headcount = String(activePeople.length);
+    // Thai government fiscal year (1 Oct – 30 Sep), derived from the real clock.
+    // Screen copy carries a {FY} placeholder rather than a baked-in year.
+    const fy = Model.fiscalYear();
+    const rawTtl = TITLES[page] || ["", ""];
+    const Ttl = rawTtl.map(t => String(t).replace(/\{FY\}/g, fy));
+
+    // Nav badges are counts, so they come from the data — never a baked-in number.
+    const navBadge = {
+      "{people}": String(activePeople.length),
+      "{alumni}": String(getAlumni(state).length),
+      "{appr}": String(getAppr(state).filter(a => a.status === "รอบันทึกผล").length)
+    };
     const navGroups = NAV[S.role].map(g => ({
       title: g[0],
       items: g[1].map(it => ({
-        label: it[1], badge: it[2] === "40" ? headcount : it[2],
+        label: it[1], badge: (navBadge[it[2]] !== undefined ? navBadge[it[2]] : it[2]) === "0" ? "" : (navBadge[it[2]] !== undefined ? navBadge[it[2]] : it[2]),
         on: navOn(page === it[0] || (it[0] === "people" && page === "person")),
         dot: (page === it[0] || (it[0] === "people" && page === "person")) ? "background:#39c1a3" : "background:rgba(255,255,255,.22)",
         go: () => go(it[0])
@@ -889,36 +1078,101 @@ const VM = (() => {
     const match = p => (!q || (p.name + p.pos + p.sub + p.interests.join()).toLowerCase().indexOf(q.toLowerCase()) >= 0) && (S.track === "ทุก Career Path" || p.track === S.track);
     const rows = activePeople.filter(match);
 
-    const watchList = activePeople.filter(p => p.hours < 30).slice(0, 5).map(p => ({ ini: p.ini, name: p.name, unit: p.unit, hours: p.hours, gap: (40 - p.hours) + " ชม.", go: () => go("person", { sel: p.id }) }));
+    // "Needs follow-up" = fewest training/meeting records logged this year, worst first.
+    const watchList = activePeople.slice()
+      .sort((a, b) => a.courseCount - b.courseCount || a.name.localeCompare(b.name, "th"))
+      .filter(p => p.courseCount < 3).slice(0, 5)
+      .map(p => ({ ini: p.ini, name: p.name, unit: p.unit, hours: p.courseCount, gap: p.courseCount === 0 ? "ยังไม่บันทึกเลย" : "บันทึกแล้ว " + p.courseCount, go: () => go("person", { sel: p.id }) }));
+    // Whole months left before the fiscal year closes on 30 Sep.
+    const fyMonthsLeft = (() => { const m = new Date().getMonth(); return m <= 8 ? 8 - m : 20 - m; })();
     const avgHours = activePeople.length ? Math.round(activePeople.reduce((a, p) => a + p.hours, 0) / activePeople.length * 10) / 10 : 0;
     const avgHoursPct = Math.min(100, Math.round(avgHours / (T(state).hours || 1) * 100));
     const cpePassCount = activePeople.filter(p => p.cpe >= T(state).cpe).length;
     const idpDonePct = activePeople.length ? Math.round(activePeople.reduce((a, p) => a + p.idpPct, 0) / activePeople.length) : 0;
     const pendingApprCount = getAppr(state).filter(a => a.status === "รอบันทึกผล").length;
 
+    // ---- Fiscal-year calendar (1 Oct – 30 Sep) --------------------------------
+    const fyEndCe = parseInt(Model.fiscalRange().end.slice(0, 4), 10);
+    const monthYearCe = m => (m >= 9 ? fyEndCe - 1 : fyEndCe);
+    const monthKeyOf = m => monthYearCe(m) + "-" + String(m + 1).padStart(2, "0");
     const monthOrder = [9, 10, 11, 0, 1, 2, 3, 4, 5, 6, 7, 8];
-    const monthTabs = monthOrder.map(m => ({ label: TH_M[m] + (m >= 9 ? " 68" : " 69"), on: pill(S.month === m), go: () => Store.setState({ month: m }) }));
-    const wd = [21, 20, 22, 21, 19, 21, 22, 21, 21, 22, 20, 21][S.month];
+    const monthTabs = monthOrder.map(m => ({
+      label: TH_M[m] + " " + String((monthYearCe(m) + 543) % 100).padStart(2, "0"),
+      on: pill(S.month === m), go: () => Store.setState({ month: m })
+    }));
+
+    // ---- Attendance: counted straight out of the secretary's saved daily log --
+    const daily = S.daily || {};
+    const daysIn = monthKey => Object.keys(daily).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k) && k.slice(0, 7) === monthKey);
+    const tallyFor = (personId, dayKeys) => {
+      const c = { work: 0, late: 0, vacation: 0, personal: 0, sick: 0, trip: 0 };
+      dayKeys.forEach(dk => { const st = (daily[dk] || {})[personId]; if (c[st] !== undefined) c[st]++; });
+      return c;
+    };
+    const selMonthDays = daysIn(monthKeyOf(S.month));
+    const dash = n => n || "–";
     const attendRows = activePeople.map(p => {
-      const i = p.id;
-      const h = Model.hash(i, S.month + 11);
-      const late = h % 11 === 0 ? 2 : h % 7 === 0 ? 1 : 0;
-      const vac = h % 9 === 0 ? 2 : h % 13 === 0 ? 1 : 0;
-      const per = h % 11 === 3 ? 1 : 0, sick = h % 8 === 2 ? 1 : 0;
-      const trip = h % 6 === 1 ? 2 : h % 5 === 2 ? 1 : 0;
-      const abs = h % 97 === 4 ? 1 : 0;
-      return { name: p.name, unit: p.unit, work: Math.max(0, wd - vac - per - sick - trip - abs), late: late || "–", vac: vac || "–", personal: per || "–", sick: sick || "–", trip: trip || "–", absent: abs || "–",
-        lateStyle: late ? "color:#8a5310;font-weight:600" : "color:#c3d2ce", absStyle: abs ? "color:#8f231b;font-weight:600" : "color:#c3d2ce" };
+      const c = tallyFor(p.id, selMonthDays);
+      return { name: p.name, unit: p.unit,
+        work: c.work + c.late, late: dash(c.late), vac: dash(c.vacation), personal: dash(c.personal), sick: dash(c.sick), trip: dash(c.trip),
+        lateStyle: c.late ? "color:#8a5310;font-weight:600" : "color:#c3d2ce" };
     });
-    const sum = k => attendRows.reduce((a, r) => a + (typeof r[k] === "number" ? r[k] : 0), 0);
+    const sumCol = k => activePeople.reduce((a, p) => a + tallyFor(p.id, selMonthDays)[k], 0);
+    const mWork = sumCol("work"), mLate = sumCol("late");
+    const mLeave = sumCol("vacation") + sumCol("personal") + sumCol("sick"), mTrip = sumCol("trip");
+    const mCells = mWork + mLate + mLeave + mTrip;
     const attendCards = [
-      { label: "วันทำการเดือนนี้", value: wd + " วัน", note: "ตามปฏิทินราชการ", color: "" },
-      { label: "อัตรามาปฏิบัติงาน", value: activePeople.length ? (100 - sum("absent") / (wd * activePeople.length) * 100).toFixed(1) + "%" : "-", note: "รวมทุกราชการ", color: "color:#0e6b5b" },
-      { label: "มาสาย", value: sum("late") + " ครั้ง", note: "จาก " + attendRows.filter(r => r.late !== "–").length + " คน", color: "color:#8a5310" },
-      { label: "ลาทุกประเภท", value: (sum("vac") + sum("personal") + sum("sick")) + " วัน", note: "พักผ่อน/กิจ/ป่วย", color: "color:#2a5f8f" },
-      { label: "ไปประชุมนอกสถานที่", value: sum("trip") + " วัน", note: "ประชุม/อบรมนอกสถานที่", color: "color:#2a5f8f" },
-      { label: "ขาดงาน", value: sum("absent") + " วัน", note: "ต้องชี้แจงเป็นลายลักษณ์อักษร", color: "color:#8f231b" }
+      { label: "วันที่บันทึกแล้ว", value: selMonthDays.length + " วัน", note: "จำนวนวันที่เลขาบันทึกในเดือนนี้", color: "" },
+      { label: "อัตรามาปฏิบัติงาน", value: mCells ? Math.round((mWork + mLate) / mCells * 100) + "%" : "–", note: "จากรายการที่บันทึกทั้งหมด", color: "color:#0e6b5b" },
+      { label: "มาปฏิบัติงาน", value: mWork + " ครั้ง", note: "ไม่รวมมาสาย", color: "" },
+      { label: "มาสาย", value: mLate + " ครั้ง", note: "นับเป็นครั้ง/รอบการประเมิน", color: "color:#8a5310" },
+      { label: "ลาทุกประเภท", value: mLeave + " วัน", note: "พักผ่อน / กิจ / ป่วย", color: "color:#2a5f8f" },
+      { label: "ไปประชุมนอกสถานที่", value: mTrip + " วัน", note: "ตามที่บันทึกรายวัน", color: "color:#1d6fa5" }
     ];
+
+    // ---- Dashboard aggregates, all derived from records actually entered -----
+    const fyMonths = monthOrder.map(m => ({ key: monthKeyOf(m), label: TH_M[m] }));
+    const courseCounts = fyMonths.map(fm =>
+      activePeople.reduce((a, p) => a + (p.courses || []).filter(c => String(c.date || "").slice(0, 7) === fm.key).length, 0));
+    const maxCourse = Math.max(1, ...courseCounts);
+    const trainBars = courseCounts.map((n, i) => ({ label: fyMonths[i].label, count: n, pct: Math.round(n / maxCourse * 100) }));
+    const trainTotal = courseCounts.reduce((a, b) => a + b, 0);
+
+    const trackDist = tracks.map(t => ({
+      name: Model.trackShortLabel(t[0]), color: t[2],
+      count: activePeople.filter(p => p.track === t[0]).length
+    }));
+    const trackDistTotal = trackDist.reduce((a, t) => a + t.count, 0);
+    let acc = 0;
+    const donutStops = trackDist.filter(t => t.count > 0).map(t => {
+      const from = acc / trackDistTotal * 100;
+      acc += t.count;
+      return t.color + " " + from.toFixed(2) + "% " + (acc / trackDistTotal * 100).toFixed(2) + "%";
+    }).join(",");
+    const donutBg = trackDistTotal ? "conic-gradient(" + donutStops + ")" : "conic-gradient(#e7edeb 0 100%)";
+    const trackUsed = trackDist.filter(t => t.count > 0).length;
+
+    const unitAgg = {};
+    activePeople.forEach(p => {
+      if (!unitAgg[p.unit]) unitAgg[p.unit] = { color: p.color, sum: 0, n: 0 };
+      unitAgg[p.unit].sum += p.idpPct; unitAgg[p.unit].n++;
+    });
+    const idpByUnitRows = Object.keys(unitAgg)
+      .map(u => ({ unit: u, color: unitAgg[u].color, pct: Math.round(unitAgg[u].sum / unitAgg[u].n) }))
+      .sort((a, b) => b.pct - a.pct);
+
+    const curMonthDays = daysIn(Model.todayMonthISO());
+    const cWork = activePeople.reduce((a, p) => a + tallyFor(p.id, curMonthDays).work, 0);
+    const cLate = activePeople.reduce((a, p) => a + tallyFor(p.id, curMonthDays).late, 0);
+    const cLeave = activePeople.reduce((a, p) => { const t = tallyFor(p.id, curMonthDays); return a + t.vacation + t.personal + t.sick; }, 0);
+    const cTrip = activePeople.reduce((a, p) => a + tallyFor(p.id, curMonthDays).trip, 0);
+    const cCells = cWork + cLate + cLeave + cTrip;
+    const dashAttend = {
+      monthLabel: TH_M[new Date().getMonth()],
+      ratePct: cCells ? Math.round((cWork + cLate) / cCells * 100) + "%" : "–",
+      late: cLate, leave: cLeave, trip: cTrip, days: curMonthDays.length,
+      lateOver: activePeople.filter(p => tallyFor(p.id, curMonthDays).late > 3).length
+    };
 
     const idpTabs = ["ทั้งหมด", "กำลังดำเนินการ", "ต้องติดตาม", "ครบถ้วนแล้ว"].map(t => ({ label: t, on: pill(S.idpFilter === t), go: () => Store.setState({ idpFilter: t }) }));
     const idpCards = activePeople.filter(p => {
@@ -1019,7 +1273,7 @@ const VM = (() => {
     const alumniRows = getAlumni(state).map(a => ({ name: a.name, pos: a.pos, unit: a.unit, start: a.start, end: a.end, years: a.years, reason: a.reason, chip: a.chip }));
 
     // Monthly leave report: aggregate every recorded day in state.daily that falls in S.reportMonth.
-    const reportMonth = S.reportMonth || "2026-08";
+    const reportMonth = S.reportMonth || Model.todayMonthISO();
     const reportRows = activePeople.map(p => {
       const counts = { vacation: 0, sick: 0, personal: 0, late: 0, trip: 0 };
       Object.keys(S.daily).forEach(dateKey => {
@@ -1033,7 +1287,7 @@ const VM = (() => {
 
     // Secretary's activity calendar: month grid of who's on leave/meeting/speaking which day.
     const MONTH_NAMES_TH = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
-    const calMonth = /^\d{4}-\d{2}$/.test(S.calMonth || "") ? S.calMonth : "2026-08";
+    const calMonth = /^\d{4}-\d{2}$/.test(S.calMonth || "") ? S.calMonth : Model.todayMonthISO();
     const calEvents = S.calendarEvents || [];
     const evTypeColor = {}; CALENDAR_EVENT_TYPES.forEach(t => evTypeColor[t[0]] = t[1]);
     let calDays = [];
@@ -1055,7 +1309,7 @@ const VM = (() => {
             remove: () => Store.setState({ calendarEvents: calEvents.filter((_, j) => j !== idx) })
           });
         });
-        calDays.push({ day: d, iso, isToday: iso === "2026-08-26", events: dayEvents, add: () => openModal("cal_new", { date: iso }) });
+        calDays.push({ day: d, iso, isToday: iso === Model.todayISO(), events: dayEvents, add: () => openModal("cal_new", { date: iso }) });
       }
     }
     const calMonthLabel = MONTH_NAMES_TH[parseInt(calMonth.slice(5, 7), 10) - 1] + " " + (parseInt(calMonth.slice(0, 4), 10) + 543);
@@ -1123,7 +1377,7 @@ const VM = (() => {
       const roleKey = ROLE_KEY_BY_LABEL[found.role] || "staff";
       const roleInfo = LOGIN_ROLES.find(r => r[0] === roleKey) || LOGIN_ROLES[0];
       const now = new Date();
-      const stamp = "26 ส.ค. 2569 " + String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
+      const stamp = Model.thToday(now) + " " + String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
       const updatedUsers = list.slice();
       updatedUsers[idx] = Object.assign({}, found, { last: stamp });
       Store.setState({ auth: true, role: roleKey, page: roleInfo[4], currentUserId: found.id, users: updatedUsers, loginRole: roleKey, tab: "overview", q: "", loginErr: false, loginErrMsg: "", loginId: "", loginPw: "" });
@@ -1223,11 +1477,13 @@ const VM = (() => {
       navGroups, roleAbbr: myRole[2], roleLabel: myRole[1], roleScope,
       userName: acct.name, userRole: acct.role, userInitials: acct.ini,
       pageTitle: Ttl[0], pageSub: Ttl[1],
+      fy, todayTh: Model.thToday(), peopleCount: activePeople.length, trackCount: tracks.length,
       isDash: page === "dash", isPeople: page === "people", isPerson: page === "person", isAttend: page === "attend", isIdp: page === "idp",
       isMe: page === "me", isDaily: page === "daily", isAppr: page === "appr", isRoster: page === "roster", isAlumni: page === "alumni", isLeaveReport: page === "leave_report",
       isCalendar: page === "calendar",
       goAttend: () => go("attend"), goPeople: () => go("people"), goPerson: id => go("person", { sel: id }),
       watchList, avgHours, avgHoursPct, cpePassCount, idpDonePct, pendingApprCount,
+      trainBars, trainTotal, trackDist, trackDistTotal, donutBg, trackUsed, idpByUnitRows, dashAttend, fyMonthsLeft,
       q: S.q, setQ: e => Store.setState({ q: e.target.value }), track: S.track, setTrack: e => Store.setState({ track: e.target.value }),
       trackOpts: ["ทุก Career Path"].concat(tracks.map(t => t[0])), trackNames: tracks.map(t => t[0]),
       rows, shownCount: rows.length, p: sel_,
@@ -1413,10 +1669,10 @@ function progressBar(pct, barStyle, height) {
 
 
 function renderLogin(vals) {
-  return h("div", { style: "min-height:100vh;display:flex;align-items:stretch" },
-    h("div", { style: "width:44%;flex:none;background:#0c2a25;color:#fff;padding:52px 54px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden" },
-      h("div", { style: "position:absolute;right:-120px;top:-80px;width:420px;height:420px;border-radius:50%;background:rgba(57,193,163,.09)" }),
-      h("div", { style: "position:absolute;right:40px;bottom:-160px;width:320px;height:320px;border-radius:50%;background:rgba(57,193,163,.06)" }),
+  return h("div", { className: "login-shell", style: "min-height:100vh;display:flex;align-items:stretch" },
+    h("div", { className: "login-hero", style: "width:44%;flex:none;background:#0c2a25;color:#fff;padding:52px 54px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden" },
+      h("div", { className: "hero-blob", style: "position:absolute;right:-120px;top:-80px;width:420px;height:420px;border-radius:50%;background:rgba(57,193,163,.09)" }),
+      h("div", { className: "hero-blob", style: "position:absolute;right:40px;bottom:-160px;width:320px;height:320px;border-radius:50%;background:rgba(57,193,163,.06)" }),
       h("div", { style: "position:relative" },
         h("div", { style: "display:flex;align-items:center;gap:12px" },
           h("div", { style: "width:40px;height:40px;flex:none;border-radius:11px;background:#39c1a3;color:#06231d;font-weight:700;font-size:17px;display:flex;align-items:center;justify-content:center;letter-spacing:-.5px" }, "ภก"),
@@ -1426,20 +1682,20 @@ function renderLogin(vals) {
           )
         )
       ),
-      h("div", { style: "position:relative;max-width:400px" },
-        h("div", { style: "font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#5f8b82;margin-bottom:14px" }, "Personnel & Development System"),
-        h("h2", { style: "margin:0;font-size:30px;font-weight:600;line-height:1.35;letter-spacing:-.4px" }, "ระบบข้อมูลบุคลากร", h("br"), "และการพัฒนารายบุคคล"),
-        h("p", { style: "font-size:13.5px;line-height:1.75;color:#a8c5be;margin:16px 0 0" }, "รวมข้อมูลประวัติการฝึกอบรม ความสนใจ Career Path แผน IDP และบันทึกเวลาปฏิบัติงานของบุคลากรกลุ่มงานเภสัชกรรมไว้ในที่เดียว"),
-        h("div", { style: "display:flex;gap:28px;margin-top:32px;padding-top:24px;border-top:1px solid rgba(255,255,255,.12)" },
-          h("div", {}, h("div", { style: "font-size:22px;font-weight:600" }, "40"), h("div", { style: "font-size:11.5px;color:#7fa89f" }, "บุคลากรในระบบ")),
-          h("div", {}, h("div", { style: "font-size:22px;font-weight:600" }, "8"), h("div", { style: "font-size:11.5px;color:#7fa89f" }, "Career Path")),
-          h("div", {}, h("div", { style: "font-size:22px;font-weight:600" }, "2569"), h("div", { style: "font-size:11.5px;color:#7fa89f" }, "ปีงบประมาณ"))
+      h("div", { className: "hero-copy", style: "position:relative;max-width:400px" },
+        h("div", { className: "hero-eyebrow", style: "font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#5f8b82;margin-bottom:14px" }, "Personnel & Development System"),
+        h("h2", { className: "hero-heading", style: "margin:0;font-size:30px;font-weight:600;line-height:1.35;letter-spacing:-.4px" }, "ระบบข้อมูลบุคลากร", h("br"), "และการพัฒนารายบุคคล"),
+        h("p", { className: "hero-lede", style: "font-size:13.5px;line-height:1.75;color:#a8c5be;margin:16px 0 0" }, "รวมข้อมูลประวัติการฝึกอบรม ความสนใจ Career Path แผน IDP และบันทึกเวลาปฏิบัติงานของบุคลากรกลุ่มงานเภสัชกรรมไว้ในที่เดียว"),
+        h("div", { className: "hero-stats", style: "display:flex;gap:28px;margin-top:32px;padding-top:24px;border-top:1px solid rgba(255,255,255,.12)" },
+          h("div", {}, h("div", { style: "font-size:22px;font-weight:600" }, vals.peopleCount), h("div", { style: "font-size:11.5px;color:#7fa89f" }, "บุคลากรในระบบ")),
+          h("div", {}, h("div", { style: "font-size:22px;font-weight:600" }, vals.trackCount), h("div", { style: "font-size:11.5px;color:#7fa89f" }, "Career Path")),
+          h("div", {}, h("div", { style: "font-size:22px;font-weight:600" }, vals.fy), h("div", { style: "font-size:11.5px;color:#7fa89f" }, "ปีงบประมาณ"))
         )
       ),
-      h("div", { style: "position:relative;font-size:11.5px;color:#5f8b82" }, "© 2569 กลุ่มงานเภสัชกรรม โรงพยาบาลเลิดสิน · กรมการแพทย์")
+      h("div", { className: "hero-footer", style: "position:relative;font-size:11.5px;color:#5f8b82" }, "© " + vals.fy + " กลุ่มงานเภสัชกรรม โรงพยาบาลเลิดสิน · กรมการแพทย์")
     ),
 
-    h("div", { style: "flex:1;min-width:0;display:flex;align-items:center;justify-content:center;padding:40px 44px" },
+    h("div", { className: "login-form-side", style: "flex:1;min-width:0;display:flex;align-items:center;justify-content:center;padding:40px 44px" },
       h("div", { style: "width:100%;max-width:472px" },
         vals.forgotOpen ? renderForgotForm(vals) : renderLoginForm(vals)
       )
@@ -1517,21 +1773,6 @@ function renderForgotForm(vals) {
 
 
 function renderDash(vals) {
-  const barPairs = [
-    [34, 9], [41, 12], [56, 14], [30, 8], [47, 11], [62, 18], [71, 16], [44, 10],
-    [38, 9, true], [52, 12, true], [58, 15, true], [33, 7, true]
-  ];
-  const monthLabels = ["ต.ค.", "พ.ย.", "ธ.ค.", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย."];
-  const trackLegend = [
-    ["Pharmaceutical Care", 14, "#a9640f"], ["Pharmaceutical Services", 7, "#0f7a86"], ["Management", 4, "#0e6b5b"],
-    ["Compounding · IV", 5, "#2a5f8f"], ["Compounding · Chemo", 4, "#5d4a9c"], ["Quality & Risk", 3, "#b0332a"],
-    ["Pharmacy Informatics", 2, "#1d6fa5"], ["Knowledge Management", 1, "#6b7a1e"]
-  ];
-  const idpByUnit = [
-    ["งานเภสัชกรรมคลินิก", 78, "#a9640f"], ["งานบริการเภสัชกรรม", 64, "#0f7a86"], ["งานผลิตยา", 59, "#2a5f8f"],
-    ["งานบริหารเวชภัณฑ์", 55, "#0e6b5b"], ["งานคุณภาพและความเสี่ยง", 41, "#b0332a"], ["งานสารสนเทศเภสัชกรรม", 36, "#1d6fa5"]
-  ];
-
   return h("div", {},
     h("div", { className: "grid-5" },
       card("", h("div", { style: "font-size:11.5px;color:#5c6b67" }, "บุคลากรทั้งหมด"),
@@ -1554,36 +1795,38 @@ function renderDash(vals) {
 
     h("div", { className: "grid-dash-top", style: "margin-top:14px" },
       card("",
-        h("div", { style: "display:flex;align-items:baseline;justify-content:space-between" },
-          h("div", {}, h("div", { style: "font-size:14px;font-weight:600" }, "ชั่วโมงพัฒนาตนเองเฉลี่ยรายเดือน"), h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, "ชั่วโมง/คน · เป้าหมาย 3.3 ชม./เดือน")),
-          h("div", { style: "display:flex;gap:12px;font-size:11px;color:#5c6b67" },
-            h("span", { style: "display:flex;align-items:center;gap:5px" }, h("span", { style: "width:9px;height:9px;border-radius:2px;background:#0e6b5b" }), "ในเวลาราชการ"),
-            h("span", { style: "display:flex;align-items:center;gap:5px" }, h("span", { style: "width:9px;height:9px;border-radius:2px;background:#9ad3c6" }), "นอกเวลา")
-          )
+        h("div", { style: "display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px" },
+          h("div", {}, h("div", { style: "font-size:14px;font-weight:600" }, "การเข้าอบรม / ประชุมวิชาการรายเดือน"), h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, "จำนวนรายการที่บุคลากรบันทึกไว้ · ปีงบประมาณ " + vals.fy)),
+          h("div", { style: "font-size:11.5px;color:#5c6b67" }, "รวม ", h("b", { style: "color:#14201d;font-weight:600" }, vals.trainTotal), " รายการ")
         ),
-        h("div", { style: "display:grid;grid-template-columns:repeat(12,1fr);gap:9px;align-items:end;height:168px;margin-top:18px;border-bottom:1px solid #e7edeb;padding-bottom:2px" },
-          barPairs.map(bp => h("div", { style: "display:flex;flex-direction:column;justify-content:flex-end;gap:2px;height:100%;" + (bp[2] ? "opacity:.35" : "") },
-            h("div", { style: `height:${bp[0]}%;background:#0e6b5b;border-radius:4px 4px 0 0` }),
-            h("div", { style: `height:${bp[1]}%;background:#9ad3c6` })
-          ))
-        ),
-        h("div", { style: "display:grid;grid-template-columns:repeat(12,1fr);gap:9px;margin-top:7px;font-size:10.5px;color:#5c6b67;text-align:center" },
-          monthLabels.map(m => h("span", {}, m))
-        )
+        vals.trainTotal === 0
+          ? h("div", { style: "margin-top:18px;padding:26px 0;text-align:center;font-size:12.5px;color:#8a968f;border:1px dashed #dde5e2;border-radius:11px" }, "ยังไม่มีบุคลากรบันทึกการอบรม / ประชุมในปีงบนี้")
+          : h("div", { className: "chart-scroll" },
+              h("div", { className: "chart-inner" },
+                h("div", { style: "display:grid;grid-template-columns:repeat(12,1fr);gap:9px;align-items:end;height:168px;margin-top:18px;border-bottom:1px solid #e7edeb;padding-bottom:2px" },
+                  vals.trainBars.map(b => h("div", { title: b.label + " · " + b.count + " รายการ", style: "display:flex;flex-direction:column;justify-content:flex-end;height:100%" },
+                    h("div", { style: `height:${b.pct}%;min-height:${b.count ? 3 : 0}px;background:#0e6b5b;border-radius:4px 4px 0 0` })
+                  ))
+                ),
+                h("div", { style: "display:grid;grid-template-columns:repeat(12,1fr);gap:9px;margin-top:7px;font-size:10.5px;color:#5c6b67;text-align:center" },
+                  vals.trainBars.map(b => h("span", {}, b.label))
+                )
+              )
+            )
       ),
       card("",
         h("div", { style: "font-size:14px;font-weight:600" }, "สัดส่วนบุคลากรตาม Career Path"),
-        h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, "Target track ที่ระบุไว้ในแผน IDP"),
-        h("div", { style: "display:flex;align-items:center;gap:20px;margin-top:16px" },
-          h("div", { style: "width:132px;height:132px;flex:none;border-radius:50%;background:conic-gradient(#a9640f 0 34%,#2a5f8f 34% 47%,#5d4a9c 47% 57%,#0f7a86 57% 74%,#0e6b5b 74% 85%,#b0332a 85% 91%,#1d6fa5 91% 96%,#6b7a1e 96% 100%);display:flex;align-items:center;justify-content:center" },
+        h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, "นับจาก Target track ที่บันทึกไว้จริง " + vals.trackDistTotal + " คน"),
+        h("div", { style: "display:flex;align-items:center;gap:20px;margin-top:16px;flex-wrap:wrap" },
+          h("div", { style: "width:132px;height:132px;flex:none;border-radius:50%;background:" + vals.donutBg + ";display:flex;align-items:center;justify-content:center" },
             h("div", { style: "width:84px;height:84px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center" },
-              h("div", { style: "font-size:20px;font-weight:600;line-height:1" }, "8"),
-              h("div", { style: "font-size:10px;color:#5c6b67" }, "tracks"))
+              h("div", { style: "font-size:20px;font-weight:600;line-height:1" }, vals.trackUsed),
+              h("div", { style: "font-size:10px;color:#5c6b67" }, "tracks ที่ใช้จริง"))
           ),
-          h("div", { style: "flex:1;min-width:0;display:flex;flex-direction:column;gap:7px;font-size:11.5px" },
-            trackLegend.map(t => h("div", { style: "display:flex;align-items:center;gap:7px" },
-              h("span", { style: `width:8px;height:8px;flex:none;border-radius:2px;background:${t[2]}` }),
-              h("span", { style: "flex:1" }, t[0]), h("b", { style: "font-weight:600" }, t[1])
+          h("div", { style: "flex:1;min-width:150px;display:flex;flex-direction:column;gap:7px;font-size:11.5px" },
+            vals.trackDist.map(t => h("div", { style: "display:flex;align-items:center;gap:7px;" + (t.count ? "" : "opacity:.4") },
+              h("span", { style: `width:8px;height:8px;flex:none;border-radius:2px;background:${t.color}` }),
+              h("span", { style: "flex:1;min-width:0" }, t.name), h("b", { style: "font-weight:600" }, t.count)
             ))
           )
         )
@@ -1592,45 +1835,46 @@ function renderDash(vals) {
 
     h("div", { className: "grid-3", style: "margin-top:14px" },
       card("",
-        h("div", { style: "font-size:14px;font-weight:600" }, "ต้องติดตาม · ชม.อบรมต่ำกว่าเกณฑ์"),
-        h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, "เหลือเวลา 2 เดือนก่อนปิดปีงบ"),
+        h("div", { style: "font-size:14px;font-weight:600" }, "ต้องติดตาม · บันทึกอบรมน้อยที่สุด"),
+        h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, vals.fyMonthsLeft > 0 ? "เหลือเวลา " + vals.fyMonthsLeft + " เดือนก่อนปิดปีงบ " + vals.fy : "เดือนสุดท้ายของปีงบ " + vals.fy),
         h("div", { style: "margin-top:14px;display:flex;flex-direction:column;gap:10px" },
+          vals.watchList.length ? null : h("div", { style: "font-size:12px;color:#8a968f;padding:6px 0" }, "ทุกคนบันทึกการอบรมครบตามเกณฑ์แล้ว"),
           vals.watchList.map(w => h("div", { onClick: w.go, className: "hoverable", style: "display:flex;align-items:center;gap:10px;cursor:pointer;padding:7px 8px;margin:0 -8px;border-radius:9px" },
             h("div", { style: "width:28px;height:28px;flex:none;border-radius:50%;background:#f2f5f4;border:1px solid #dde5e2;font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center" }, w.ini),
             h("div", { style: "flex:1;min-width:0" },
               h("div", { style: "font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" }, w.name),
               h("div", { style: "font-size:10.5px;color:#5c6b67;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" }, w.unit)),
-            h("div", { style: "text-align:right" },
-              h("div", { style: "font-size:12.5px;font-weight:600;color:#a9640f" }, w.hours + " ชม."),
-              h("div", { style: "font-size:10px;color:#5c6b67" }, "ขาดอีก " + w.gap))
+            h("div", { style: "text-align:right;flex:none" },
+              h("div", { style: "font-size:12.5px;font-weight:600;color:#a9640f" }, w.hours + " รายการ"),
+              h("div", { style: "font-size:10px;color:#5c6b67" }, w.gap))
           ))
         )
       ),
       card("",
         h("div", { style: "font-size:14px;font-weight:600" }, "ความก้าวหน้า IDP รายหน่วยงาน"),
-        h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, "% กิจกรรมที่ดำเนินการแล้ว"),
+        h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, "% เฉลี่ยจากแผน IDP ที่บันทึกไว้จริง"),
         h("div", { style: "margin-top:16px;display:flex;flex-direction:column;gap:13px" },
-          idpByUnit.map(u => h("div", {},
-            h("div", { style: "display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px" }, h("span", {}, u[0]), h("b", { style: "font-weight:600" }, u[1] + "%")),
-            progressBar(u[1], "background:" + u[2], "7px")
-          ))
+          vals.idpByUnitRows.map(u => h("div", {},
+            h("div", { style: "display:flex;justify-content:space-between;gap:10px;font-size:12px;margin-bottom:5px" }, h("span", { style: "min-width:0" }, u.unit), h("b", { style: "font-weight:600;flex:none" }, u.pct + "%")),
+            progressBar(u.pct, "background:" + u.color, "7px")
+          )),
+          vals.idpByUnitRows.length ? null : h("div", { style: "font-size:12px;color:#8a968f;padding:6px 0" }, "ยังไม่มีข้อมูลบุคลากรในระบบ")
         )
       ),
       card("",
         h("div", { style: "display:flex;align-items:baseline;justify-content:space-between" },
-          h("div", { style: "font-size:14px;font-weight:600" }, "สรุปขาด-ลา-มาสาย เดือน ส.ค."),
+          h("div", { style: "font-size:14px;font-weight:600" }, "สรุปขาด-ลา-มาสาย เดือน " + vals.dashAttend.monthLabel),
           h("button", { onClick: vals.goAttend, style: "border:0;background:transparent;color:#0e6b5b;font-size:12px;cursor:pointer;padding:0;font-weight:500" }, "ดูทั้งหมด")
         ),
         h("div", { className: "grid-2", style: "margin-top:14px;gap:9px" },
-          h("div", { style: "background:#f4f7f6;border-radius:10px;padding:11px 12px" }, h("div", { style: "font-size:11px;color:#5c6b67" }, "มาปฏิบัติงาน"), h("div", { style: "font-size:19px;font-weight:600;margin-top:2px" }, "96.4%")),
-          h("div", { style: "background:#fdf1e0;border-radius:10px;padding:11px 12px" }, h("div", { style: "font-size:11px;color:#8a5310" }, "มาสาย"), h("div", { style: "font-size:19px;font-weight:600;margin-top:2px;color:#8a5310" }, "11 ครั้ง")),
-          h("div", { style: "background:#e6eef7;border-radius:10px;padding:11px 12px" }, h("div", { style: "font-size:11px;color:#2a5f8f" }, "ลาทุกประเภท"), h("div", { style: "font-size:19px;font-weight:600;margin-top:2px;color:#2a5f8f" }, "37 วัน")),
-          h("div", { style: "background:#fbe9e7;border-radius:10px;padding:11px 12px" }, h("div", { style: "font-size:11px;color:#8f231b" }, "ขาดงาน"), h("div", { style: "font-size:19px;font-weight:600;margin-top:2px;color:#8f231b" }, "1 วัน"))
+          h("div", { style: "background:#f4f7f6;border-radius:10px;padding:11px 12px" }, h("div", { style: "font-size:11px;color:#5c6b67" }, "อัตรามาปฏิบัติงาน"), h("div", { style: "font-size:19px;font-weight:600;margin-top:2px" }, vals.dashAttend.ratePct)),
+          h("div", { style: "background:#fdf1e0;border-radius:10px;padding:11px 12px" }, h("div", { style: "font-size:11px;color:#8a5310" }, "มาสาย"), h("div", { style: "font-size:19px;font-weight:600;margin-top:2px;color:#8a5310" }, vals.dashAttend.late + " ครั้ง")),
+          h("div", { style: "background:#e6eef7;border-radius:10px;padding:11px 12px" }, h("div", { style: "font-size:11px;color:#2a5f8f" }, "ลาทุกประเภท"), h("div", { style: "font-size:19px;font-weight:600;margin-top:2px;color:#2a5f8f" }, vals.dashAttend.leave + " วัน")),
+          h("div", { style: "background:#e9f1fa;border-radius:10px;padding:11px 12px" }, h("div", { style: "font-size:11px;color:#1d6fa5" }, "ไปประชุมนอกสถานที่"), h("div", { style: "font-size:19px;font-weight:600;margin-top:2px;color:#1d6fa5" }, vals.dashAttend.trip + " วัน"))
         ),
         h("div", { style: "margin-top:14px;padding-top:13px;border-top:1px solid #eef2f1;font-size:11.5px;color:#5c6b67;line-height:1.7" },
-          h("div", { style: "display:flex;justify-content:space-between" }, h("span", {}, "ไปราชการ/ประชุมนอกสถานที่"), h("b", { style: "color:#14201d;font-weight:600" }, "24 วัน")),
-          h("div", { style: "display:flex;justify-content:space-between" }, h("span", {}, "ลาศึกษาต่อ (ลาเรียนต่อเนื่อง)"), h("b", { style: "color:#14201d;font-weight:600" }, "1 คน")),
-          h("div", { style: "display:flex;justify-content:space-between" }, h("span", {}, "ผู้ที่มาสายเกิน 3 ครั้ง/เดือน"), h("b", { style: "color:#8a5310;font-weight:600" }, "2 คน"))
+          h("div", { style: "display:flex;justify-content:space-between;gap:10px" }, h("span", {}, "วันที่เลขาบันทึกแล้วเดือนนี้"), h("b", { style: "color:#14201d;font-weight:600" }, vals.dashAttend.days + " วัน")),
+          h("div", { style: "display:flex;justify-content:space-between;gap:10px" }, h("span", {}, "ผู้ที่มาสายเกิน 3 ครั้ง/เดือน"), h("b", { style: "color:#8a5310;font-weight:600" }, vals.dashAttend.lateOver + " คน"))
         )
       )
     )
@@ -1723,7 +1967,7 @@ function renderPerson(vals) {
         ),
         h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;overflow:hidden" },
           h("div", { style: "padding:18px 20px 13px;display:flex;align-items:baseline;justify-content:space-between" },
-            h("div", {}, h("div", { style: "font-size:14px;font-weight:600" }, "ประวัติการฝึกอบรม / ประชุมวิชาการ"), h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, p.courseCount + " รายการ ในปีงบประมาณ 2569")),
+            h("div", {}, h("div", { style: "font-size:14px;font-weight:600" }, "ประวัติการฝึกอบรม / ประชุมวิชาการ"), h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, p.courseCount + " รายการ ในปีงบประมาณ " + vals.fy)),
             h("div", { style: "font-size:11.5px;color:#5c6b67" }, "รวม " + p.hours + " ชม. · CPE " + p.cpe + " หน่วย")
           ),
           h("div", { className: "table-scroll" },
@@ -1757,7 +2001,7 @@ function renderPerson(vals) {
       h("div", { style: "display:flex;flex-direction:column;gap:14px" },
         h("div", { className: "kpi-dark", style: "background:#0c2a25;border-radius:14px;padding:18px 20px;color:#fff" },
           h("div", { style: "font-size:14px;font-weight:600" }, "KPI การเรียนรู้และพัฒนา"),
-          h("div", { style: "font-size:11.5px;color:#8fb6ae;margin-top:2px" }, "ปีงบประมาณ 2569"),
+          h("div", { style: "font-size:11.5px;color:#8fb6ae;margin-top:2px" }, "ปีงบประมาณ " + vals.fy),
           h("div", { className: "grid-2", style: "margin-top:15px;gap:11px" },
             kpiTile("ชม.อบรม / เป้า " + vals.tHours, p.hours), kpiTile("CPE / เป้า " + vals.tCpe, p.cpe),
             kpiTile("เป็นวิทยากร", p.talkCount + " เรื่อง"), kpiTile("ผลงานวิจัย", p.resCount + " เรื่อง")
@@ -1780,11 +2024,11 @@ function renderPerson(vals) {
           )
         ),
         card("",
-          h("div", { style: "display:flex;align-items:baseline;justify-content:space-between" }, h("div", { style: "font-size:14px;font-weight:600" }, "แผน IDP 2569"), h("span", { style: "font-size:11.5px;color:#5c6b67" }, p.idpDone + "/" + p.idpTotal + " ด้าน")),
+          h("div", { style: "display:flex;align-items:baseline;justify-content:space-between" }, h("div", { style: "font-size:14px;font-weight:600" }, "แผน IDP " + vals.fy), h("span", { style: "font-size:11.5px;color:#5c6b67" }, p.idpDone + "/" + p.idpTotal + " ด้าน")),
           h("div", { style: "margin-top:13px;display:flex;flex-direction:column;gap:11px" }, p.idp.map(idpCard))
         ),
         card("",
-          h("div", { style: "font-size:14px;font-weight:600" }, "ขาด · ลา · มาสาย (ปีงบ 2569)"),
+          h("div", { style: "font-size:14px;font-weight:600" }, "ขาด · ลา · มาสาย (ปีงบ " + vals.fy + ")"),
           h("div", { style: "margin-top:13px;display:flex;flex-direction:column;gap:9px;font-size:12px" },
             p.leaveRows.map(l => h("div", { style: "display:flex;align-items:center;gap:10px" },
               h("span", { style: "width:110px;flex:none;color:#3d4b47" }, l.label),
@@ -1839,7 +2083,7 @@ function renderAttend(vals) {
     ),
     h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;overflow:hidden" },
       h("div", { style: "padding:16px 20px 12px;display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid #eef2f1" },
-        h("div", {}, h("div", { style: "font-size:14px;font-weight:600" }, "บันทึกเวลาปฏิบัติงานรายบุคคล · เดือน" + vals.monthName + " 2569"), h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, "ข้อมูลจากการบันทึกของเลขากลุ่มงาน · หน่วย: วัน (มาสาย = ครั้ง)")),
+        h("div", {}, h("div", { style: "font-size:14px;font-weight:600" }, "บันทึกเวลาปฏิบัติงานรายบุคคล · เดือน" + vals.monthName + " " + vals.fy), h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, "ข้อมูลจากการบันทึกของเลขากลุ่มงาน · หน่วย: วัน (มาสาย = ครั้ง)")),
         h("button", { style: "border:1px solid #dde5e2;background:#fff;padding:7px 13px;border-radius:9px;font-size:12px;cursor:pointer;color:#3d4b47" }, "ส่งออก Excel")
       ),
       h("div", { style: "max-height:520px;overflow:auto" },
@@ -1847,8 +2091,8 @@ function renderAttend(vals) {
         h("table", { style: "width:100%;font-size:12.5px" },
           h("thead", {}, h("tr", { style: "background:#f7faf9;color:#5c6b67;font-size:11px;text-align:left;position:sticky;top:0" },
             h("th", { style: "padding:10px 20px;font-weight:500" }, "ชื่อ – สกุล"),
-            ["มาปฏิบัติงาน", "มาสาย", "ลาพักผ่อน", "ลากิจ", "ลาป่วย", "ลาคลอด", "ลาศึกษาต่อ", "ไปราชการ"].map(t => h("th", { style: "padding:10px 8px;font-weight:500;text-align:center" }, t)),
-            h("th", { style: "padding:10px 20px;font-weight:500;text-align:center" }, "ขาดงาน")
+            ["มาปฏิบัติงาน", "มาสาย", "ลาพักผ่อน", "ลากิจ", "ลาป่วย"].map(t => h("th", { style: "padding:10px 8px;font-weight:500;text-align:center" }, t)),
+            h("th", { style: "padding:10px 20px;font-weight:500;text-align:center" }, "ไปประชุมนอกสถานที่")
           )),
           h("tbody", {}, vals.attendRows.map(r => h("tr", { style: "border-top:1px solid #eef2f1" },
             h("td", { style: "padding:9px 20px" }, h("div", { style: "font-weight:500" }, r.name), h("div", { style: "font-size:10.5px;color:#5c6b67" }, r.unit)),
@@ -1857,10 +2101,7 @@ function renderAttend(vals) {
             h("td", { style: "padding:9px 8px;text-align:center;color:#5c6b67" }, r.vac),
             h("td", { style: "padding:9px 8px;text-align:center;color:#5c6b67" }, r.personal),
             h("td", { style: "padding:9px 8px;text-align:center;color:#5c6b67" }, r.sick),
-            h("td", { style: "padding:9px 8px;text-align:center;color:#5c6b67" }, r.mat),
-            h("td", { style: "padding:9px 8px;text-align:center;color:#5c6b67" }, r.study),
-            h("td", { style: "padding:9px 8px;text-align:center;color:#2a5f8f" }, r.trip),
-            h("td", { style: "padding:9px 20px;text-align:center;" + r.absStyle }, r.absent)
+            h("td", { style: "padding:9px 20px;text-align:center;color:#1d6fa5" }, r.trip)
           )))
         )
         )
@@ -1909,7 +2150,7 @@ function renderMe(vals) {
       h("div", { style: "font-size:12.5px;color:#5c6b67;margin-top:6px" }, "ให้ผู้ดูแลระบบเพิ่มบุคลากรและผูกบัญชีนี้กับชื่อของคุณก่อน (เมนู สิทธิ์ผู้ใช้งาน)"));
   }
   return h("div", {},
-    h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;padding:20px 22px;display:flex;gap:20px;align-items:flex-start" },
+    h("div", { className: "me-header", style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;padding:20px 22px;display:flex;gap:20px;align-items:flex-start" },
       h("div", { style: "width:60px;height:60px;flex:none;border-radius:16px;font-size:19px;font-weight:600;display:flex;align-items:center;justify-content:center;color:#fff;" + me.avaBg }, me.ini),
       h("div", { style: "flex:1;min-width:0" },
         h("div", { style: "display:flex;align-items:center;gap:9px;flex-wrap:wrap" },
@@ -1918,7 +2159,7 @@ function renderMe(vals) {
         ),
         h("div", { style: "font-size:12.5px;color:#5c6b67;margin-top:4px" }, me.pos + " · " + me.unit + " · อายุงาน " + me.tenure)
       ),
-      h("div", { style: "display:flex;gap:10px;flex:none" },
+      h("div", { className: "me-stats", style: "display:flex;gap:10px;flex:none" },
         h("div", { style: "text-align:center;padding:9px 15px;border-radius:11px;background:#f7faf9;border:1px solid #e7edeb" }, h("div", { style: "font-size:10.5px;color:#5c6b67" }, "ชม.อบรมปีนี้"), h("div", { style: "font-size:17px;font-weight:600" }, me.hours, h("span", { style: "font-size:11px;color:#5c6b67" }, "/" + vals.tHours))),
         h("div", { style: "text-align:center;padding:9px 15px;border-radius:11px;background:#f7faf9;border:1px solid #e7edeb" }, h("div", { style: "font-size:10.5px;color:#5c6b67" }, "วันลาพักผ่อนคงเหลือ"), h("div", { style: "font-size:17px;font-weight:600" }, me.vacLeft, h("span", { style: "font-size:11px;color:#5c6b67" }, " วัน"))),
         h("div", { style: "text-align:center;padding:9px 15px;border-radius:11px;background:#fdf1e0;border:1px solid #f2ddba" }, h("div", { style: "font-size:10.5px;color:#8a5310" }, "มาสายได้อีก"), h("div", { style: "font-size:17px;font-weight:600;color:#8a5310" }, me.lateLeft, h("span", { style: "font-size:11px" }, " ครั้ง")))
@@ -1957,7 +2198,7 @@ function renderMeOverview(vals) {
         )
       ),
       card("",
-        h("div", { style: "display:flex;align-items:baseline;justify-content:space-between" }, h("div", { style: "font-size:14px;font-weight:600" }, "แผน IDP ของฉัน 2569"), h("span", { style: "font-size:11.5px;color:#5c6b67" }, me.idpDone + "/" + me.idpTotal + " ด้าน")),
+        h("div", { style: "display:flex;align-items:baseline;justify-content:space-between" }, h("div", { style: "font-size:14px;font-weight:600" }, "แผน IDP ของฉัน " + vals.fy), h("span", { style: "font-size:11.5px;color:#5c6b67" }, me.idpDone + "/" + me.idpTotal + " ด้าน")),
         h("div", { style: "margin-top:13px;display:flex;flex-direction:column;gap:11px" }, me.idp.map(idpCard))
       )
     )
@@ -2088,7 +2329,7 @@ function renderMeLeave(vals) {
   return h("div", { className: "grid-2b", style: "align-items:start" },
     h("div", { style: "display:flex;flex-direction:column;gap:14px" },
       card("",
-        h("div", { style: "font-size:14px;font-weight:600" }, "สิทธิวันลาคงเหลือ · ปีงบ 2569"),
+        h("div", { style: "font-size:14px;font-weight:600" }, "สิทธิวันลาคงเหลือ · ปีงบ " + vals.fy),
         h("div", { style: "margin-top:15px;display:flex;flex-direction:column;gap:14px" },
           me.leaveRows.map(l => h("div", {},
             h("div", { style: "display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px" }, h("span", {}, l.label), h("span", { style: "color:#5c6b67" }, l.txt)),
@@ -2123,9 +2364,9 @@ function renderMeLeave(vals) {
 
 function renderDaily(vals) {
   return h("div", {},
-    h("div", { style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;padding:15px 20px;display:flex;align-items:center;gap:16px;margin-bottom:14px" },
-      h("div", {}, h("div", { style: "font-size:11px;color:#5c6b67;margin-bottom:5px" }, "วันที่บันทึก"), h("input", { value: vals.dailyDate, onInput: vals.setDailyDate, type: "date", style: "padding:8px 12px;border:1px solid #dde5e2;border-radius:9px;outline:none" })),
-      h("div", { style: "display:flex;gap:9px;padding-left:16px;border-left:1px solid #eef2f1" },
+    h("div", { className: "daily-toolbar", style: "background:#fff;border:1px solid #dde5e2;border-radius:14px;padding:15px 20px;display:flex;align-items:center;gap:16px;margin-bottom:14px" },
+      h("div", { className: "daily-datefield" }, h("div", { style: "font-size:11px;color:#5c6b67;margin-bottom:5px" }, "วันที่บันทึก"), h("input", { value: vals.dailyDate, onInput: vals.setDailyDate, type: "date", style: "padding:8px 12px;border:1px solid #dde5e2;border-radius:9px;outline:none" })),
+      h("div", { className: "daily-summary", style: "display:flex;gap:9px;padding-left:16px;border-left:1px solid #eef2f1" },
         vals.dailySummary.map(s => h("div", { style: "text-align:center;padding:7px 14px;border-radius:10px;" + s.bg }, h("div", { style: "font-size:10.5px" }, s.label), h("div", { style: "font-size:17px;font-weight:600" }, s.value)))
       ),
       h("div", { style: "flex:1" }),
@@ -2163,6 +2404,7 @@ function renderCalendar(vals) {
         vals.calEventTypes.map(t => h("span", { style: "display:flex;align-items:center;gap:5px" }, h("span", { style: `width:8px;height:8px;border-radius:2px;background:${t[1]}` }), t[0]))
       )
     ),
+    h("div", { className: "calendar-scroll" },
     h("div", { className: "calendar-grid", style: "margin-bottom:6px;font-size:11px;color:#5c6b67;text-align:center;font-weight:500" },
       dowLabels.map(d => h("div", {}, d))
     ),
@@ -2179,6 +2421,7 @@ function renderCalendar(vals) {
             )
           )
       ))
+    )
     );
 }
 
@@ -2385,7 +2628,7 @@ function renderAdmTarget(vals) {
     h("div", { className: "grid-target", style: "align-items:start" },
       card("",
         h("div", { style: "display:flex;align-items:baseline;justify-content:space-between" },
-          h("div", {}, h("div", { style: "font-size:14px;font-weight:600" }, "ค่าเป้าหมายของกลุ่มงาน · ปีงบประมาณ 2569"), h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, "แก้ไขแล้วมีผลทันทีกับ Dashboard, KPI รายบุคคล และหน้าวันลา")),
+          h("div", {}, h("div", { style: "font-size:14px;font-weight:600" }, "ค่าเป้าหมายของกลุ่มงาน · ปีงบประมาณ " + vals.fy), h("div", { style: "font-size:11.5px;color:#5c6b67;margin-top:2px" }, "แก้ไขแล้วมีผลทันทีกับ Dashboard, KPI รายบุคคล และหน้าวันลา")),
           h("button", { onClick: vals.resetTargets, style: "border:1px solid #dde5e2;background:#fff;padding:7px 13px;border-radius:9px;font-size:12px;cursor:pointer;color:#3d4b47" }, "คืนค่าเริ่มต้น")
         ),
         h("div", { className: "grid-2", style: "gap:12px;margin-top:16px" },
@@ -2483,29 +2726,29 @@ function renderModal(vals) {
 
 function renderSidebar(vals) {
   return h("aside", { className: "app-sidebar" },
-    h("div", { style: "padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.09)" },
+    h("div", { className: "sidebar-brand", style: "padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.09)" },
       h("div", { style: "display:flex;align-items:center;gap:11px" },
-        h("div", { style: "width:34px;height:34px;flex:none;border-radius:9px;background:#39c1a3;color:#06231d;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;letter-spacing:-.5px" }, "ภก"),
+        h("div", { className: "brand-mark", style: "width:34px;height:34px;flex:none;border-radius:9px;background:#39c1a3;color:#06231d;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;letter-spacing:-.5px" }, "ภก"),
         h("div", { style: "min-width:0" },
-          h("div", { style: "font-size:13.5px;font-weight:600;color:#fff;line-height:1.25" }, "กลุ่มงานเภสัชกรรม"),
-          h("div", { style: "font-size:11px;color:#7fa89f;line-height:1.3" }, "โรงพยาบาลเลิดสิน")
+          h("div", { className: "brand-name", style: "font-size:13.5px;font-weight:600;color:#fff;line-height:1.25" }, "กลุ่มงานเภสัชกรรม"),
+          h("div", { className: "brand-sub", style: "font-size:11px;color:#7fa89f;line-height:1.3" }, "โรงพยาบาลเลิดสิน")
         )
       ),
-      h("div", { style: "margin-top:14px;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#5f8b82" }, "Personnel & Development")
+      h("div", { className: "brand-eyebrow", style: "margin-top:14px;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#5f8b82" }, "Personnel & Development")
     ),
-    h("nav", { style: "flex:1;overflow:auto;padding:14px 12px" },
-      vals.navGroups.map(g => h("div", { style: "margin-bottom:16px" },
-        h("div", { style: "font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#5f8b82;padding:0 8px 7px" }, g.title),
-        g.items.map(it => h("button", { onClick: it.go, style: "width:100%;display:flex;align-items:center;gap:9px;padding:9px 10px;margin-bottom:2px;border:0;border-radius:9px;text-align:left;cursor:pointer;font-size:13px;line-height:1.3;transition:background .15s;" + it.on },
-          h("span", { style: "width:5px;height:5px;flex:none;border-radius:50%;" + it.dot }),
-          h("span", { style: "flex:1" }, it.label),
-          h("span", { style: "font-size:10.5px;color:#6f9b92" }, it.badge)
+    h("nav", { className: "sidebar-nav", style: "flex:1;overflow:auto;padding:14px 12px" },
+      vals.navGroups.map(g => h("div", { className: "nav-group", style: "margin-bottom:16px" },
+        h("div", { className: "nav-group-title", style: "font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#5f8b82;padding:0 8px 7px" }, g.title),
+        g.items.map(it => h("button", { onClick: it.go, className: "nav-btn", style: "width:100%;display:flex;align-items:center;gap:9px;padding:9px 10px;margin-bottom:2px;border:0;border-radius:9px;text-align:left;cursor:pointer;font-size:13px;line-height:1.3;transition:background .15s;" + it.on },
+          h("span", { className: "nav-dot", style: "width:5px;height:5px;flex:none;border-radius:50%;" + it.dot }),
+          h("span", { className: "nav-label", style: "flex:1" }, it.label),
+          it.badge ? h("span", { className: "nav-badge", style: "font-size:10.5px;color:#6f9b92" }, it.badge) : null
         ))
       ))
     ),
-    h("div", { style: "padding:14px 16px;border-top:1px solid rgba(255,255,255,.09);display:flex;align-items:center;gap:10px" },
-      h("div", { style: "width:32px;height:32px;flex:none;border-radius:50%;background:rgba(255,255,255,.12);color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center" }, vals.userInitials),
-      h("div", { style: "min-width:0;flex:1" },
+    h("div", { className: "sidebar-user", style: "padding:14px 16px;border-top:1px solid rgba(255,255,255,.09);display:flex;align-items:center;gap:10px" },
+      h("div", { className: "user-ava", style: "width:32px;height:32px;flex:none;border-radius:50%;background:rgba(255,255,255,.12);color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center" }, vals.userInitials),
+      h("div", { className: "user-meta", style: "min-width:0;flex:1" },
         h("div", { style: "font-size:12px;color:#fff;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" }, vals.userName),
         h("div", { style: "font-size:10.5px;color:#7fa89f" }, vals.userRole)
       ),
@@ -2515,21 +2758,21 @@ function renderSidebar(vals) {
 }
 
 function renderHeader(vals) {
-  return h("header", { style: "position:sticky;top:0;z-index:20;background:rgba(255,255,255,.94);backdrop-filter:blur(8px);border-bottom:1px solid #dde5e2;padding:13px 30px;display:flex;align-items:center;gap:20px" },
-    h("div", { style: "flex:1;min-width:0" },
+  return h("header", { className: "app-header", style: "position:sticky;top:0;z-index:20;background:rgba(255,255,255,.94);backdrop-filter:blur(8px);border-bottom:1px solid #dde5e2;padding:13px 30px;display:flex;align-items:center;gap:20px" },
+    h("div", { className: "header-title", style: "flex:1;min-width:0" },
       h("h1", { style: "margin:0;font-size:18px;font-weight:600;letter-spacing:-.2px" }, vals.pageTitle),
       h("div", { style: "font-size:12px;color:#5c6b67;margin-top:2px" }, vals.pageSub)
     ),
-    h("div", { style: "display:flex;align-items:center;gap:9px;padding:6px 12px 6px 10px;background:#f2f5f4;border:1px solid #dde5e2;border-radius:11px" },
+    h("div", { className: "header-role", style: "display:flex;align-items:center;gap:9px;padding:6px 12px 6px 10px;background:#f2f5f4;border:1px solid #dde5e2;border-radius:11px" },
       h("span", { style: "width:22px;height:22px;flex:none;border-radius:7px;background:#0c2a25;color:#fff;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center" }, vals.roleAbbr),
       h("span", { style: "line-height:1.25" },
         h("span", { style: "display:block;font-size:12.5px;font-weight:600" }, vals.roleLabel),
         h("span", { style: "display:block;font-size:10.5px;color:#5c6b67" }, "สิทธิ์การเข้าถึง: " + vals.roleScope)
       )
     ),
-    h("div", { style: "font-size:12px;color:#5c6b67;border-left:1px solid #dde5e2;padding-left:16px;text-align:right;line-height:1.35" },
-      h("div", { style: "color:#14201d;font-weight:500" }, "26 ส.ค. 2569"),
-      h("div", {}, "ปีงบประมาณ 2569")
+    h("div", { className: "header-date", style: "font-size:12px;color:#5c6b67;border-left:1px solid #dde5e2;padding-left:16px;text-align:right;line-height:1.35" },
+      h("div", { style: "color:#14201d;font-weight:500" }, vals.todayTh),
+      h("div", {}, "ปีงบประมาณ " + vals.fy)
     )
   );
 }
