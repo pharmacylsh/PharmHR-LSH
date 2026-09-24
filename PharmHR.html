@@ -286,19 +286,35 @@ const SUPABASE_ENABLED = true;
 // Optional cross-device sync via Supabase (Postgres). Only activates when
 // SUPABASE_ENABLED is true and SUPABASE_URL/SUPABASE_ANON_KEY (see
 // supabase-config.js) are filled in — otherwise every function here is a harmless
-// no-op and the app keeps using only this browser's local storage, exactly like before.
+// no-op and the app keeps using only this browser's local storage.
 //
-// Model: the whole shared slice of app state lives in ONE row (id = "shared") of the
-// `pharmhr_state` table, as a single jsonb column. Every device that changes
-// something upserts that row; every device subscribes to Postgres changes on it and
-// applies whatever it now holds. That means it's last-write-wins — fine for a small
-// internal team, but two people editing the exact same moment can have one edit
-// overwrite the other.
+// Two storage modes, picked automatically at startup:
+//
+//   "tables" — the normalized schema from supabase-schema.sql is installed, so the
+//     data lives in ~18 real tables (persons, daily_attendance, courses, …) that you
+//     can browse, query and export in the Supabase dashboard. Postgres does the
+//     state<->rows conversion in two functions, so the app itself still works with
+//     one state object: pharmhr_load_state() reads, pharmhr_save_state() writes all
+//     tables in a single transaction.
+//
+//   "blob" — the original single-row fallback (pharmhr_state.state as jsonb). Used
+//     when the schema hasn't been installed yet, so a newly deployed HTML file keeps
+//     working until the SQL is run.
+//
+// Either way it's last-write-wins: fine for a small internal team, but two people
+// saving at the same moment can have one edit overwrite the other.
 const RemoteSync = (() => {
   const TABLE = "pharmhr_state";
   const ROW_ID = "shared";
+  const REV_TABLE = "pharmhr_rev";
+  const PUSH_DEBOUNCE_MS = 600;
+
   let client = null;
+  let mode = null;            // null = still deciding, then "tables" | "blob"
   let lastPushedRev = null;
+  let pendingState = null;    // newest state waiting to be written
+  let pushTimer = null;
+  let onRemote = null;
 
   function isConfigured() {
     return typeof SUPABASE_ENABLED !== "undefined" && SUPABASE_ENABLED
@@ -314,41 +330,112 @@ const RemoteSync = (() => {
     if (error) console.warn("PharmHR sync: anonymous sign-in failed", error);
   }
 
+  function newRev() {
+    return Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+  }
+
+  // ---- reading ---------------------------------------------------------------
+
+  async function loadFromTables() {
+    const { data, error } = await client.rpc("pharmhr_load_state");
+    if (error) throw error;
+    return data;
+  }
+
+  async function loadFromBlob() {
+    const { data, error } = await client.from(TABLE).select("state").eq("id", ROW_ID).maybeSingle();
+    if (error) throw error;
+    return data && data.state;
+  }
+
+  function pullAndApply() {
+    const read = mode === "tables" ? loadFromTables() : loadFromBlob();
+    read.then(state => { if (state && onRemote) onRemote(state); })
+        .catch(e => console.warn("PharmHR sync: read failed", e));
+  }
+
+  // ---- writing ---------------------------------------------------------------
+
+  function flush() {
+    pushTimer = null;
+    if (!client || pendingState === null) return;
+    // Still deciding which mode to use — try again shortly rather than dropping it.
+    if (mode === null) { pushTimer = setTimeout(flush, 200); return; }
+
+    const state = pendingState;
+    pendingState = null;
+    const rev = newRev();
+    lastPushedRev = rev;
+
+    const write = mode === "tables"
+      ? client.rpc("pharmhr_save_state", { p_state: state, p_rev: rev })
+      : client.from(TABLE).upsert({ id: ROW_ID, state, rev, updated_at: new Date().toISOString() });
+
+    Promise.resolve(write).then(res => {
+      if (res && res.error) console.warn("PharmHR sync: push failed", res.error);
+    });
+  }
+
+  // Coalesces bursts of edits (typing in a tag box fires setState per keystroke) into
+  // one write, so a whole-database rewrite doesn't run on every character.
+  function push(state) {
+    if (!client) return;
+    pendingState = state;
+    if (pushTimer) clearTimeout(pushTimer);
+    pushTimer = setTimeout(flush, PUSH_DEBOUNCE_MS);
+  }
+
+  // ---- startup ---------------------------------------------------------------
+
+  function subscribeTables() {
+    client.channel("pharmhr-rev-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: REV_TABLE }, payload => {
+        const row = payload.new;
+        if (row && row.rev && row.rev === lastPushedRev) return;  // echo of our own write
+        pullAndApply();
+      })
+      .subscribe();
+  }
+
+  function subscribeBlob() {
+    client.channel("pharmhr-state-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: TABLE, filter: "id=eq." + ROW_ID }, payload => {
+        const row = payload.new;
+        if (!row || !row.state) return;
+        if (row.rev && row.rev === lastPushedRev) return;
+        if (onRemote) onRemote(row.state);
+      })
+      .subscribe();
+  }
+
   function init(onRemoteState) {
     if (!isConfigured()) return false;
+    onRemote = onRemoteState;
     try {
       client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      ensureSignedIn().then(() => {
-        // Initial read, in case the row already exists before our subscription below
-        // starts receiving change events.
-        client.from(TABLE).select("state, rev").eq("id", ROW_ID).maybeSingle()
-          .then(({ data, error }) => {
-            if (error) { console.warn("PharmHR sync: initial fetch failed", error); return; }
-            if (data && data.state) onRemoteState(data.state);
-          });
-
-        client.channel("pharmhr-state-changes")
-          .on("postgres_changes", { event: "*", schema: "public", table: TABLE, filter: "id=eq." + ROW_ID }, payload => {
-            const row = payload.new;
-            if (!row || !row.state) return;
-            if (row.rev && row.rev === lastPushedRev) return; // echo of our own write
-            onRemoteState(row.state);
-          })
-          .subscribe();
+      ensureSignedIn().then(async () => {
+        try {
+          const state = await loadFromTables();
+          mode = "tables";
+          if (state && onRemote) onRemote(state);
+          subscribeTables();
+        } catch (e) {
+          // Schema not installed (or not readable) — keep the old single-row behaviour
+          // so the app still syncs until supabase-schema.sql has been run.
+          mode = "blob";
+          console.warn("PharmHR sync: normalized schema unavailable, using single-row mode.", e && e.message);
+          try {
+            const state = await loadFromBlob();
+            if (state && onRemote) onRemote(state);
+          } catch (e2) { console.warn("PharmHR sync: initial fetch failed", e2); }
+          subscribeBlob();
+        }
       }).catch(e => console.warn("PharmHR sync: setup failed", e));
       return true;
     } catch (e) {
       console.warn("PharmHR sync: init failed, staying in local-only mode", e);
       return false;
     }
-  }
-
-  function push(state) {
-    if (!client) return;
-    const rev = Date.now() + "-" + Math.random().toString(36).slice(2, 8);
-    lastPushedRev = rev;
-    client.from(TABLE).upsert({ id: ROW_ID, state, rev, updated_at: new Date().toISOString() })
-      .then(({ error }) => { if (error) console.warn("PharmHR sync: push failed", error); });
   }
 
   // Uploads a file to the "attachments" storage bucket (see SETUP-SYNC.md) and
@@ -368,7 +455,10 @@ const RemoteSync = (() => {
     }
   }
 
-  return { init, push, uploadFile };
+  // Exposed for the console: RemoteSync.storageMode() tells you which mode is live.
+  function storageMode() { return mode; }
+
+  return { init, push, uploadFile, storageMode };
 })();
 
 
@@ -677,7 +767,7 @@ const Store = (() => {
     q: "", track: "ทุก Career Path", idpFilter: "ทั้งหมด",
     coursesByPerson: {}, talksByPerson: {}, researchByPerson: {}, idpByPerson: {},
     tagsByPerson: {}, aspireByPerson: {}, savedMsg: "",
-    conf: {}, confInterest: [], daily: {}, dailySavedDates: {}, dailyDate: Model.todayISO(),
+    confInterest: [], daily: {}, dailySavedDates: {}, dailyDate: Model.todayISO(),
     calendarEvents: [], calMonth: Model.todayMonthISO(),
     modal: null, form: {}, __contextPersonId: null
   });
@@ -699,7 +789,7 @@ const Store = (() => {
   const SHARED_KEYS = [
     "newPersons", "deletedIds", "confList", "apprList", "alumniList", "targets", "tracks", "users",
     "coursesByPerson", "talksByPerson", "researchByPerson", "idpByPerson", "tagsByPerson", "aspireByPerson",
-    "conf", "confInterest", "daily", "dailySavedDates", "calendarEvents"
+    "confInterest", "daily", "dailySavedDates", "calendarEvents"
   ];
 
   const PERSIST_KEYS = SESSION_KEYS.concat(SHARED_KEYS);
@@ -1452,14 +1542,8 @@ const VM = (() => {
           fld(state, "เหตุผลที่สนใจ / ประโยชน์ต่อหน่วยงาน", "note", "")]) }
       : { title: "", sub: "", cta: "บันทึก", fields: [] };
 
-    const lr = LOGIN_ROLES.find(r => r[0] === S.loginRole) || LOGIN_ROLES[0];
-    const loginRoles = LOGIN_ROLES.map(r => {
-      const on = S.loginRole === r[0];
-      return { label: r[1], abbr: r[2], desc: r[3], pick: () => Store.setState({ loginRole: r[0], loginErr: false, loginErrMsg: "" }),
-        card: on ? "border:1.5px solid #0e6b5b;background:#f4faf8;box-shadow:0 1px 0 rgba(14,107,91,.06)" : "border:1.5px solid #dde5e2;background:#fff",
-        badge: on ? "background:#0e6b5b;color:#fff" : "background:#f2f5f4;color:#5c6b67",
-        check: on ? "background:#0e6b5b" : "background:#e7edeb;color:#e7edeb" };
-    });
+    // No role picker on the login screen: the account's role (set by the admin) is
+    // the single source of truth, and doLogin routes straight to that role's page.
     const doLogin = () => {
       const id = S.loginId.trim(), pw = S.loginPw;
       if (!id || !pw) { Store.setState({ loginErr: true, loginErrMsg: "กรุณากรอกชื่อผู้ใช้และรหัสผ่านให้ครบถ้วน" }); return; }
@@ -1575,7 +1659,6 @@ const VM = (() => {
       resetTargets: () => { Model.invalidate(); Store.setState({ targets: null, admSaved: "คืนค่าเป้าหมายเป็นค่าเริ่มต้นของกลุ่มงานแล้ว" }); },
       saveTargets: () => Store.setState({ admSaved: "บันทึกเป้าหมายและ KPI เรียบร้อย · มีผลกับทุกหน้าทันที" }),
       tCourses: TG.courses, tLate: TG.late,
-      loginRoles, loginAs: " · " + lr[1],
       loginId: S.loginId, setLoginId: e => Store.setState({ loginId: e.target.value, loginErr: false, loginErrMsg: "" }),
       loginPw: S.loginPw, setLoginPw: e => Store.setState({ loginPw: e.target.value, loginErr: false, loginErrMsg: "" }),
       loginKey: e => { if (e.key === "Enter") doLogin(); },
@@ -1823,20 +1906,9 @@ function renderLogin(vals) {
 function renderLoginForm(vals) {
   return h("div", {},
     h("h1", { style: "margin:0;font-size:24px;font-weight:600;letter-spacing:-.3px" }, "เข้าสู่ระบบ"),
-    h("p", { style: "font-size:13px;color:#5c6b67;margin:7px 0 0" }, "เลือกประเภทผู้ใช้งาน แล้วเข้าสู่ระบบด้วยบัญชีของโรงพยาบาล"),
+    h("p", { style: "font-size:13px;color:#5c6b67;margin:7px 0 0" }, "เข้าสู่ระบบด้วยบัญชีของโรงพยาบาล · ระบบจะพาไปยังหน้าตามสิทธิ์ที่ผู้ดูแลระบบกำหนดไว้โดยอัตโนมัติ"),
 
-    h("div", { style: "display:flex;flex-direction:column;gap:9px;margin-top:24px" },
-      vals.loginRoles.map(r => h("button", { onClick: r.pick, style: "width:100%;display:flex;align-items:center;gap:13px;padding:14px 15px;border-radius:13px;cursor:pointer;text-align:left;transition:border-color .15s;" + r.card },
-        h("span", { style: "width:34px;height:34px;flex:none;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;" + r.badge }, r.abbr),
-        h("span", { style: "flex:1;min-width:0" },
-          h("span", { style: "display:block;font-size:13.5px;font-weight:600;color:#14201d" }, r.label),
-          h("span", { style: "display:block;font-size:11.5px;color:#5c6b67;margin-top:2px;line-height:1.45" }, r.desc)
-        ),
-        h("span", { style: "width:18px;height:18px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;" + r.check }, "✓")
-      ))
-    ),
-
-    h("div", { style: "margin-top:22px;display:flex;flex-direction:column;gap:13px" },
+    h("div", { style: "margin-top:24px;display:flex;flex-direction:column;gap:13px" },
       h("div", {},
         h("div", { style: "font-size:11.5px;color:#5c6b67;margin-bottom:6px" }, "ชื่อผู้ใช้ / รหัสพนักงาน"),
         h("input", { value: vals.loginId, onInput: vals.setLoginId, onKeydown: vals.loginKey, placeholder: "กรอกเลขประจำตัวผู้ใช้งาน", style: "width:100%;padding:11px 13px;border:1px solid #dde5e2;border-radius:10px;background:#fff;outline:none;font-size:13px" })
@@ -1853,7 +1925,7 @@ function renderLoginForm(vals) {
         h("input", { type: "checkbox", checked: vals.remember, onChange: vals.toggleRemember, style: "width:15px;height:15px;accent-color:#0e6b5b;cursor:pointer" }),
         "จดจำการเข้าสู่ระบบบนเครื่องนี้"
       ),
-      h("button", { onClick: vals.doLogin, style: "width:100%;border:0;background:#0e6b5b;color:#fff;padding:13px;border-radius:11px;font-size:14px;font-weight:600;cursor:pointer;margin-top:3px" }, "เข้าสู่ระบบ" + vals.loginAs)
+      h("button", { onClick: vals.doLogin, style: "width:100%;border:0;background:#0e6b5b;color:#fff;padding:13px;border-radius:11px;font-size:14px;font-weight:600;cursor:pointer;margin-top:3px" }, "เข้าสู่ระบบ")
     ),
 
     h("div", { style: "font-size:11.5px;color:#8a968f;margin-top:16px;line-height:1.6" }, "ระบบนี้เข้าถึงได้เฉพาะเจ้าหน้าที่กลุ่มงานเภสัชกรรม · บุคลากรจะเห็นเฉพาะข้อมูลของตนเอง")
